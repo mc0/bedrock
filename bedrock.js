@@ -723,6 +723,18 @@
       return this.models[index];
     },
 
+    // Move provided models to index.
+    move: function(models, index, opts) {
+      var options = opts || {};
+      if (!_.isArray(models)) models = [models];
+      this.remove(models, _.defaults({silent: true}, options));
+      this.add(models, _.defaults({at: index, silent: true}, options));
+      if (!options.silent) {
+          this.trigger('move', this, models, index, options);
+          this.trigger('reset', this, options);
+      }
+    },
+
     // Return models with matching attributes. Useful for simple cases of
     // `filter`.
     where: function(attrs, first) {
