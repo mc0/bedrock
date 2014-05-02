@@ -271,7 +271,8 @@
   // is automatically generated and assigned in the attributes.
 
   // Doesn't clone attributes parameter unless done so in parse.
-  var Model = Bedrock.Model = function(attributes, options) {
+  var Model = Bedrock.Model = function(attributes, opts) {
+    var options = opts || {};
     this.cid = 'c' + (uniqueCIDCount++);
     var attrs = this.parse(attributes, options) || {};
     if (this.defaults) {
