@@ -569,6 +569,13 @@
       return convertedModels;
     },
 
+    // Removes a number of models at an index.
+    removeAtIndex: function(index, howMany, options) {
+      var removed = this.models.slice(index, index + howMany);
+      this.remove(removed, options);
+      return removed;
+    },
+
     // Update a collection by `set`-ing a new list of models, adding new ones,
     // removing models that are no longer present, and merging models that
     // already exist in the collection, as necessary. Similar to **Model#set**,
