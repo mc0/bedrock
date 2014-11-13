@@ -585,6 +585,7 @@
       var toAdd = [], toRemove = [], modelMap = {};
       var add = options.add, merge = options.merge, remove = options.remove;
       var order = !sortable && add && remove ? [] : false;
+      var orderChanged = false;
       var i, l, id, model, existing, sort, attrs;
 
       // Turn bare objects into model references, and prevent invalid models
@@ -619,7 +620,12 @@
 
         // Do not add multiple models with the same `id`.
         model = existing || model;
-        if (order && !modelMap[model.id]) order.push(model);
+        if (order && !modelMap[model.id]) {
+          order.push(model);
+
+          // Check to see if this is actually a new model at this index.
+          orderChanged = orderChanged || !this.models[i] || model.cid !== this.models[i].cid;
+        }
         modelMap[model.id] = true;
       }
 
@@ -633,7 +639,7 @@
 
       // See if sorting is needed, update `length` and splice in new models.
       var numToAdd = toAdd.length;
-      if (numToAdd || (order && order.length)) {
+      if (numToAdd || orderChanged) {
         if (sortable) sort = true;
         if (at != null && at < this.length) {
           // Splice.apply could hit args limit.
@@ -662,7 +668,7 @@
       }
 
       // Trigger `sort` if the collection was sorted.
-      if (sort || (order && order.length)) this.trigger('sort', this, options);
+      if (sort || orderChanged) this.trigger('sort', this, options);
       return models;
     },
 
