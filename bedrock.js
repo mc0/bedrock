@@ -561,10 +561,9 @@
     },
 
     // Remove a model, or a list of models from the set.
-    remove: function(models, opts) {
-      // Re-run with an array and return the first item for non-arrays
-      if (!_.isArray(models)) return Collection.prototype.remove.call(this, [models])[0];
-
+    remove: function(m, opts) {
+      var singular = !_.isArray(models);
+      var models = singular ? [m] : m;
       var convertedModels = [];
       var options = opts || {};
       var i, l, index, model;
@@ -582,18 +581,17 @@
         }
         this._removeReference(model);
       }
-      return convertedModels;
+      return singular ? convertedModels[0]: convertedModels;
     },
 
     // Update a collection by `set`-ing a new list of models, adding new ones,
     // removing models that are no longer present, and merging models that
     // already exist in the collection, as necessary. Similar to **Model#set**,
     // the core operation for updating the data contained by the collection.
-    set: function(models, opts) {
-      // Re-run with an array and return the first item for non-arrays
-      if (!_.isArray(models)) return this.remove(models ? [models] : [])[0];
-
+    set: function(m, opts) {
       var options = _.defaults({}, opts, setOptions);
+      var singular = !_.isArray(m);
+      var models = singular ? (m ? [m] : []) : m;
       if (options.parse) models = this.parse(models, options);
       var at = options.at;
       var sortable = this.comparator && (at == null) && options.sort !== false;
@@ -602,7 +600,8 @@
       var add = options.add, merge = options.merge, remove = options.remove;
       var order = !sortable && add && remove ? [] : false;
       var orderChanged = false;
-      var i, l, id, model, existing, sort, attrs;
+      var sort = false;
+      var i, l, id, model, existing, attrs;
 
       // Turn bare objects into model references, and prevent invalid models
       // from being added.
@@ -675,19 +674,19 @@
       // Silently sort the collection if appropriate.
       if (sort) this.sort({silent: true});
 
-      if (options.silent) return models;
+      if (!options.silent) {
+        var addOpts = at != null ? _.clone(options) : options;
+        // Trigger `add` events.
+        for (i = 0; i < numToAdd; i++) {
+          model = toAdd[i];
+          if (at != null) addOpts.index = at + i;
+          model.trigger('add', model, this, addOpts);
+        }
 
-      var addOpts = at != null ? _.clone(options) : options;
-      // Trigger `add` events.
-      for (i = 0; i < numToAdd; i++) {
-        model = toAdd[i];
-        if (at != null) addOpts.index = at + i;
-        model.trigger('add', model, this, addOpts);
+        // Trigger `sort` if the collection was sorted.
+        if (sort || orderChanged) this.trigger('sort', this, options);
       }
-
-      // Trigger `sort` if the collection was sorted.
-      if (sort || orderChanged) this.trigger('sort', this, options);
-      return models;
+      return singular ? models[0] : models;
     },
 
     // When you have more items than you want to add or remove individually,
