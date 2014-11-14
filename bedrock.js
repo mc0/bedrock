@@ -595,6 +595,7 @@
       var models = singular ? (m ? [m] : []) : m;
       if (options.parse) models = this.parse(models, options);
       var at = options.at;
+      if (at < 0) at += this.length + 1;
       var sortable = this.comparator && (at == null) && options.sort !== false;
       var sortAttr = _.isString(this.comparator) ? this.comparator : null;
       var toAdd = [], toRemove = [], modelMap = {};
