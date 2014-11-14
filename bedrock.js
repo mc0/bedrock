@@ -837,7 +837,7 @@
     // Create a new collection with an identical list of models as this one.
     // Doesn't keep the comparator.
     clone: function(opts) {
-      var options = _.extend({modelOptions: this._modelOptions}, opts);
+      var options = _.extend({modelOptions: this._modelOptions, model: this.model}, opts);
       return new this.constructor(this.models, options);
     },
 
