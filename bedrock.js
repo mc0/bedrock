@@ -292,10 +292,10 @@
   var Model = Bedrock.Model = function(attributes, opts) {
     var options = opts || {};
     this.cid = 'c' + (uniqueCIDCount++);
-    var attrs = this.parse(attributes, options) || {};
-    if (this.defaults) {
-      attrs = _.defaults({}, attrs, this.defaults);
-    }
+    var validAttrs = this.parse(attributes, options);
+    var attrs = validAttrs || {};
+    if (validAttrs === false) this.valid = false;
+    if (this.defaults) attrs = _.defaults({}, attrs, this.defaults);
     if (attrs.hasOwnProperty(this.idAttribute)) this.id = attrs[this.idAttribute];
     this._previousAttributes = {};
     this.attributes = attrs;
@@ -312,6 +312,10 @@
     // The default name for the JSON `id` attribute is `"id"`. MongoDB and
     // CouchDB users may want to set this to `"_id"`.
     idAttribute: 'id',
+
+    // If the parse method returned false then the model is not valid and
+    // this would be set to false. It will not be added to a collection.
+    valid: true,
 
     // Initialize is an empty function by default. Override it with your own
     // initialization logic.
@@ -350,7 +354,7 @@
     set: function(key, val, opts) {
       var attr, attrs, unset, changes, silent, changing, prev, current;
       var options, changed, attrDiffers;
-      if (key == null) return this;
+      if (key == null || key === false) return this;
 
       // Fast-track for handling .unset and .clear
       unset = opts === unsetObject && (options = (val || {}));
@@ -592,8 +596,7 @@
     set: function(m, opts) {
       var options = _.defaults({}, opts, setOptions);
       var singular = !_.isArray(m);
-      var models = singular ? (m ? [m] : []) : m;
-      if (options.parse) models = this.parse(models, options);
+      var models = this.parse(singular ? (m ? [m] : []) : m, options);
       var at = options.at;
       if (at < 0) at += this.length + 1;
       var sortable = this.comparator && (at == null) && options.sort !== false;
@@ -620,8 +623,11 @@
         if (existing = this.get(id)) {
           if (remove) modelMap[existing.cid] = true;
           if (merge) {
-            attrs = attrs === model ? model.attributes : attrs;
-            if (options.parse) attrs = existing.parse(attrs, options);
+            if (attrs === model) {
+              attrs = model.attributes;
+            } else {
+              attrs = this.model.prototype.parse(attrs, options);
+            }
             existing.set(attrs, options);
             if (sortable && !sort && existing.hasChanged(sortAttr)) sort = true;
           }
@@ -630,7 +636,7 @@
         // If this is a new, valid model, push it to the `toAdd` list.
         } else if (add) {
           model = models[i] = this._prepareModel(attrs, options);
-          if (!model) continue;
+          if (!model || !model.valid) continue;
           toAdd.push(model);
           this._addReference(model);
         }
@@ -833,6 +839,7 @@
 
     // **parse** converts a response into a list of models to be added to the
     // collection. The default implementation is just to pass it through.
+    // You do NOT have to check a models' valid property; that happens automatically.
     parse: function(resp, options) {
       return resp;
     },
