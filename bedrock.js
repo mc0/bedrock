@@ -470,7 +470,7 @@
     // Get all of the attributes of the model at the time of the previous
     // `"change"` event.
     previousAttributes: function() {
-      return _.clone(this._previousAttributes);
+      return _.extend({}, this.attributes, this._previousAttributes);
     },
 
     // Destroy this model by removing listeners and triggering an event.
