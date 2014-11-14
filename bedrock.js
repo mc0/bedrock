@@ -562,13 +562,12 @@
 
     // Remove a model, or a list of models from the set.
     remove: function(m, opts) {
-      var singular = !_.isArray(models);
-      var models = singular ? [m] : m;
-      var convertedModels = [];
+      var singular = !_.isArray(m);
+      var models = singular ? [m] : m.slice();
       var options = opts || {};
       var i, l, index, model;
       for (i = 0, l = models.length; i < l; i++) {
-        model = convertedModels[i] = this.get(models[i]);
+        model = models[i] = this.get(models[i]);
         if (!model) continue;
         delete this._byId[model.id];
         delete this._byId[model.cid];
@@ -581,7 +580,7 @@
         }
         this._removeReference(model);
       }
-      return singular ? convertedModels[0]: convertedModels;
+      return singular ? models[0]: models;
     },
 
     // Update a collection by `set`-ing a new list of models, adding new ones,
