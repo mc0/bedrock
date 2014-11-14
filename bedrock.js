@@ -1135,7 +1135,6 @@
     // routes can be defined at the bottom of the route map.
     _bindRoutes: function() {
       if (!this.routes) return;
-      this.routes = this.routes;
       var route, routes = _.keys(this.routes);
       while ((route = routes.pop()) != null) {
         this.route(route, this.routes[route]);
