@@ -118,7 +118,10 @@
     once: function(name, callback, context) {
       if (!eventsApi(this, 'once', name, [callback, context]) || !callback) return this;
       var self = this;
+      var ran = false;
       function once() {
+        if (ran) return;
+        ran = true;
         self.off(name, once);
         callback.apply(this, arguments);
       }
@@ -172,6 +175,35 @@
       if (events) triggerEvents(events, args);
       if (allEvents) triggerEvents(allEvents, arguments);
       return this;
+    },
+
+    // Inversion-of-control versions of `on` and `once`. Tell *this* object to
+    // listen to an event in another object ... keeping track of what it's
+    // listening to.
+    listenTo: function(obj, name, callback) {
+      var listeningTo = this._listeningTo || (this._listeningTo = {});
+      var id = obj._listenId || (obj._listenId = uniqueLIDCount++);
+      listeningTo[id] = obj;
+      if (!callback && typeof name === 'object') callback = this;
+      obj.on(name, callback, this);
+      return this;
+    },
+
+    listenToOnce: function(obj, name, callback) {
+      if (typeof name === 'object') {
+        // Cannot use eventsApi since we need to call it on this but send obj.
+        for (var event in name) this.listenToOnce(obj, event, name[event]);
+        return this;
+      }
+      var ran = false, cb;
+      cb = function() {
+        if (ran) return;
+        ran = true;
+        this.stopListening(obj, name, cb);
+        callback.apply(this, arguments);
+      };
+      cb._callback = callback;
+      return this.listenTo(obj, name, cb);
     },
 
     // Tell this object to stop listening to either specific events ... or
@@ -234,22 +266,6 @@
       default: while (++i < l) (ev = events[i]).callback.apply(ev.ctx, args); return;
     }
   };
-
-  var listenMethods = {listenTo: 'on', listenToOnce: 'once'};
-
-  // Inversion-of-control versions of `on` and `once`. Tell *this* object to
-  // listen to an event in another object ... keeping track of what it's
-  // listening to.
-  _.each(listenMethods, function(implementation, method) {
-    Events[method] = function(obj, name, callback) {
-      var listeningTo = this._listeningTo || (this._listeningTo = {});
-      var id = obj._listenId || (obj._listenId = uniqueLIDCount++);
-      listeningTo[id] = obj;
-      if (!callback && typeof name === 'object') callback = this;
-      obj[implementation](name, callback, this);
-      return this;
-    };
-  });
 
   // Aliases for backwards compatibility.
   Events.bind   = Events.on;
@@ -452,7 +468,7 @@
     // Get all of the attributes of the model at the time of the previous
     // `"change"` event.
     previousAttributes: function() {
-      return _.clone(this._previousAttributes);
+      return _.extend({}, this.attributes, this._previousAttributes);
     },
 
     // Destroy this model by removing listeners and triggering an event.
@@ -545,15 +561,13 @@
     },
 
     // Remove a model, or a list of models from the set.
-    remove: function(models, opts) {
-      // Re-run with an array and return the first item for non-arrays
-      if (!_.isArray(models)) return Collection.prototype.remove.call(this, [models])[0];
-
-      var convertedModels = [];
+    remove: function(m, opts) {
+      var singular = !_.isArray(m);
+      var models = singular ? [m] : m.slice();
       var options = opts || {};
       var i, l, index, model;
       for (i = 0, l = models.length; i < l; i++) {
-        model = convertedModels[i] = this.get(models[i]);
+        model = models[i] = this.get(models[i]);
         if (!model) continue;
         delete this._byId[model.id];
         delete this._byId[model.cid];
@@ -566,27 +580,28 @@
         }
         this._removeReference(model);
       }
-      return convertedModels;
+      return singular ? models[0]: models;
     },
 
     // Update a collection by `set`-ing a new list of models, adding new ones,
     // removing models that are no longer present, and merging models that
     // already exist in the collection, as necessary. Similar to **Model#set**,
     // the core operation for updating the data contained by the collection.
-    set: function(models, opts) {
-      // Re-run with an array and return the first item for non-arrays
-      if (!_.isArray(models)) return this.remove(models ? [models] : [])[0];
-
+    set: function(m, opts) {
       var options = _.defaults({}, opts, setOptions);
+      var singular = !_.isArray(m);
+      var models = singular ? (m ? [m] : []) : m;
       if (options.parse) models = this.parse(models, options);
       var at = options.at;
+      if (at < 0) at += this.length + 1;
       var sortable = this.comparator && (at == null) && options.sort !== false;
       var sortAttr = _.isString(this.comparator) ? this.comparator : null;
       var toAdd = [], toRemove = [], modelMap = {};
       var add = options.add, merge = options.merge, remove = options.remove;
       var order = !sortable && add && remove ? [] : false;
       var orderChanged = false;
-      var i, l, id, model, existing, sort, attrs;
+      var sort = false;
+      var i, l, id, model, existing, attrs;
 
       // Turn bare objects into model references, and prevent invalid models
       // from being added.
@@ -620,13 +635,15 @@
 
         // Do not add multiple models with the same `id`.
         model = existing || model;
+        if (!model) continue;
         if (order && !modelMap[model.id]) {
           order.push(model);
 
           // Check to see if this is actually a new model at this index.
           orderChanged = orderChanged || !this.models[i] || model.cid !== this.models[i].cid;
         }
-        modelMap[model.id] = true;
+        // If a model doesn't have an id don't store it in modelMap
+        if (model.id != null) modelMap[model.id] = true;
       }
 
       // Remove nonexistent models if appropriate.
@@ -659,17 +676,19 @@
       // Silently sort the collection if appropriate.
       if (sort) this.sort({silent: true});
 
-      if (options.silent) return models;
+      if (!options.silent) {
+        var addOpts = at != null ? _.clone(options) : options;
+        // Trigger `add` events.
+        for (i = 0; i < numToAdd; i++) {
+          model = toAdd[i];
+          if (at != null) addOpts.index = at + i;
+          model.trigger('add', model, this, addOpts);
+        }
 
-      // Trigger `add` events.
-      for (i = 0; i < numToAdd; i++) {
-        model = toAdd[i];
-        model.trigger('add', model, this, options);
+        // Trigger `sort` if the collection was sorted.
+        if (sort || orderChanged) this.trigger('sort', this, options);
       }
-
-      // Trigger `sort` if the collection was sorted.
-      if (sort || orderChanged) this.trigger('sort', this, options);
-      return models;
+      return singular ? models[0] : models;
     },
 
     // When you have more items than you want to add or remove individually,
@@ -677,7 +696,7 @@
     // any granular `add` or `remove` events. Fires `reset` when finished.
     // Useful for bulk operations and optimizations.
     reset: function(resetModels, opts) {
-      var options = opts || {};
+      var options = _.extend({}, opts);
       for (var i = 0, l = this.length; i < l; i++) {
         this._removeReference(this.models[i]);
       }
@@ -727,6 +746,7 @@
 
     // Get the model at the given index.
     at: function(index) {
+      if (index < 0) index += this.length;
       return this.models[index];
     },
 
@@ -818,7 +838,7 @@
     // Create a new collection with an identical list of models as this one.
     // Doesn't keep the comparator.
     clone: function(opts) {
-      var options = _.extend({modelOptions: this._modelOptions}, opts);
+      var options = _.extend({modelOptions: this._modelOptions, model: this.model}, opts);
       return new this.constructor(this.models, options);
     },
 
@@ -1115,7 +1135,6 @@
     // routes can be defined at the bottom of the route map.
     _bindRoutes: function() {
       if (!this.routes) return;
-      this.routes = this.routes;
       var route, routes = _.keys(this.routes);
       while ((route = routes.pop()) != null) {
         this.route(route, this.routes[route]);
