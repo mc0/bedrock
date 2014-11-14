@@ -641,7 +641,8 @@
           // Check to see if this is actually a new model at this index.
           orderChanged = orderChanged || !this.models[i] || model.cid !== this.models[i].cid;
         }
-        modelMap[model.id] = true;
+        // If a model doesn't have an id don't store it in modelMap
+        if (model.id != null) modelMap[model.id] = true;
       }
 
       // Remove nonexistent models if appropriate.
