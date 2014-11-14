@@ -661,10 +661,12 @@
 
       if (options.silent) return models;
 
+      var addOpts = at != null ? _.clone(options) : options;
       // Trigger `add` events.
       for (i = 0; i < numToAdd; i++) {
         model = toAdd[i];
-        model.trigger('add', model, this, options);
+        if (at != null) addOpts.index = at + i;
+        model.trigger('add', model, this, addOpts);
       }
 
       // Trigger `sort` if the collection was sorted.
