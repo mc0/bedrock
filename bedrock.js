@@ -118,7 +118,10 @@
     once: function(name, callback, context) {
       if (!eventsApi(this, 'once', name, [callback, context]) || !callback) return this;
       var self = this;
+      var ran = false;
       function once() {
+        if (ran) return;
+        ran = true;
         self.off(name, once);
         callback.apply(this, arguments);
       }
@@ -172,6 +175,35 @@
       if (events) triggerEvents(events, args);
       if (allEvents) triggerEvents(allEvents, arguments);
       return this;
+    },
+
+    // Inversion-of-control versions of `on` and `once`. Tell *this* object to
+    // listen to an event in another object ... keeping track of what it's
+    // listening to.
+    listenTo: function(obj, name, callback) {
+      var listeningTo = this._listeningTo || (this._listeningTo = {});
+      var id = obj._listenId || (obj._listenId = uniqueLIDCount++);
+      listeningTo[id] = obj;
+      if (!callback && typeof name === 'object') callback = this;
+      obj.on(name, callback, this);
+      return this;
+    },
+
+    listenToOnce: function(obj, name, callback) {
+      if (typeof name === 'object') {
+        // Cannot use eventsApi since we need to call it on this but send obj.
+        for (var event in name) this.listenToOnce(obj, event, name[event]);
+        return this;
+      }
+      var ran = false, cb;
+      cb = function() {
+        if (ran) return;
+        ran = true;
+        this.stopListening(obj, name, cb);
+        callback.apply(this, arguments);
+      };
+      cb._callback = callback;
+      return this.listenTo(obj, name, cb);
     },
 
     // Tell this object to stop listening to either specific events ... or
@@ -234,22 +266,6 @@
       default: while (++i < l) (ev = events[i]).callback.apply(ev.ctx, args); return;
     }
   };
-
-  var listenMethods = {listenTo: 'on', listenToOnce: 'once'};
-
-  // Inversion-of-control versions of `on` and `once`. Tell *this* object to
-  // listen to an event in another object ... keeping track of what it's
-  // listening to.
-  _.each(listenMethods, function(implementation, method) {
-    Events[method] = function(obj, name, callback) {
-      var listeningTo = this._listeningTo || (this._listeningTo = {});
-      var id = obj._listenId || (obj._listenId = uniqueLIDCount++);
-      listeningTo[id] = obj;
-      if (!callback && typeof name === 'object') callback = this;
-      obj[implementation](name, callback, this);
-      return this;
-    };
-  });
 
   // Aliases for backwards compatibility.
   Events.bind   = Events.on;
