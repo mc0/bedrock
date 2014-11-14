@@ -697,7 +697,7 @@
     // any granular `add` or `remove` events. Fires `reset` when finished.
     // Useful for bulk operations and optimizations.
     reset: function(resetModels, opts) {
-      var options = opts || {};
+      var options = _.extend({}, opts);
       for (var i = 0, l = this.length; i < l; i++) {
         this._removeReference(this.models[i]);
       }
