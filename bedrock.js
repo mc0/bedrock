@@ -389,7 +389,16 @@
       for (attr in attrs) {
         if (!unset) val = attrs[attr];
         attrDiffers = !_.isEqual(current[attr], val);
-        if (attrDiffers) changes.push(attr);
+        if (attrDiffers) {
+          // Check for changes of `id`.
+          if (attr === this.idAttribute) {
+            this.id = val;
+            // Always fire change:id before firing any other change events
+            changes.unshift(attr);
+          } else {
+            changes.push(attr);
+          }
+        }
         if (changing && _.isEqual(prev[attr], val)) {
           delete changed[attr];
         } else if (attrDiffers) {
@@ -398,9 +407,6 @@
         if (!changing || !prev.hasOwnProperty(attr)) prev[attr] = current[attr];
         current[attr] = val;
       }
-
-      // Check for changes of `id`.
-      if (attrs.hasOwnProperty(this.idAttribute)) this.id = attrs[this.idAttribute];
 
       // Trigger all relevant attribute changes.
       if (!silent && changes.length) {
@@ -749,7 +755,7 @@
     // Get a model from the set by id.
     get: function(obj) {
       if (obj == null) return void 0;
-      return this._byId[obj] || this._byId[obj.id] || this._byId[obj.cid];
+      return this._byId[obj.id != null ? obj.id : obj.cid || obj];
     },
 
     // Get the model at the given index.
