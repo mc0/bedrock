@@ -863,7 +863,6 @@
     _addReference: function(model) {
       this._byId[model.cid] = model;
       if (model.id != null) this._byId[model.id] = model;
-      if (!model.collection) model.collection = this;
       model.on('all', this._onModelEvent, this);
     },
 
