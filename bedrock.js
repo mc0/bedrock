@@ -471,7 +471,7 @@
     // Get the previous value of an attribute, recorded at the time the last
     // `"change"` event was fired.
     previous: function(attr) {
-      if (attr == null || !this._previousAttributes) return null;
+      if (attr == null || this._previousAttributes == null) return null;
       // If it wasn't changed in the last set, then we can just return the current.
       return this._previousAttributes.hasOwnProperty(attr) ?
         this._previousAttributes[attr] : this.attributes[attr];
@@ -480,6 +480,7 @@
     // Get all of the attributes of the model at the time of the previous
     // `"change"` event.
     previousAttributes: function() {
+      if (this._previousAttributes == null) return {};
       return _.extend({}, this.attributes, this._previousAttributes);
     },
 
