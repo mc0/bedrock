@@ -297,8 +297,8 @@
     if (validAttrs === false) this.valid = false;
     if (this.defaults) attrs = _.defaults({}, attrs, this.defaults);
     if (attrs.hasOwnProperty(this.idAttribute)) this.id = attrs[this.idAttribute];
-    this._previousAttributes = {};
     this.attributes = attrs;
+    this._previousAttributes = null;
     this.changed = {};
     this.initialize.call(this, attrs, options);
   };
