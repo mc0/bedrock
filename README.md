@@ -36,8 +36,6 @@ When cloning on a collection, a custom `comparator` is NOT transferred over to t
 
 Defining a `modelId` is not supported.
 
-`previous` does not return initial attributes sent to a model's constructor (pending [Pull Request](https://github.com/jashkenas/backbone/pull/3388) for backbone)
-
 # Why?
 
 Grooveshark needed a extremely lightweight framework for dealing with Models/Collections. It was acceptable to cut features and cut corners
