@@ -348,6 +348,12 @@
       return this.get(attr) != null;
     },
 
+    // Handle merges, which happen when a duplicate (new) model is added to a
+    // collection. Default is to just call set.
+    merge: function(newAttrs, opts) {
+      return this.set(newAttrs, opts);
+    },
+
     // Set a hash of model attributes on the object, firing `"change"`. This is
     // the core primitive operation of a model, updating the data and notifying
     // anyone who needs to know about the change in state. The heart of the beast.
@@ -538,6 +544,7 @@
       this.models = [];
       this._byId  = {};
     }
+    if (options.mergeOnAdd !== undefined) this.mergeOnAdd = !!options.mergeOnAdd;
     this.initialize(models, options);
   };
 
@@ -562,6 +569,9 @@
     // The default length of 0
     length: 0,
 
+    // Should we default to merging when add() is called
+    mergeOnAdd: false,
+
     // The JSON representation of a Collection is an array of the
     // models' attributes.
     toJSON: function(options) {
@@ -570,7 +580,7 @@
 
     // Add a model, or list of models to the set.
     add: function(models, options) {
-      return this.set(models, _.extend({merge: false}, options, addOptions));
+      return this.set(models, _.extend({merge: this.mergeOnAdd}, options, addOptions));
     },
 
     // Remove a model, or a list of models from the set.
@@ -629,13 +639,14 @@
         // optionally merge it into the existing model.
         if (existing = this.get(id)) {
           if (remove) modelMap[existing.cid] = true;
-          if (merge) {
+          if (merge && attrs !== existing) {
+            // If they sent a model then pick the arguments off it.
             if (attrs === model) {
               attrs = model.attributes;
             } else {
               attrs = this.model.prototype.parse(attrs, options);
             }
-            existing.set(attrs, options);
+            existing.merge(attrs, options);
             if (sortable && !sort && existing.hasChanged(sortAttr)) sort = true;
           }
           models[i] = existing;

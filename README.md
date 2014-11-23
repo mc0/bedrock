@@ -9,7 +9,8 @@ A simplified, fast framework for Models, Views, Controllers and Events based off
 
 `Model.collection` will never exist.
 
-`Model.unset` sets keys on `attributes` to undefined instead of deleting them.
+Collection constructor accepts `mergeOnAdd` which can be used to overwrite the default merge option (false) for `add`. Models now have a
+`merge` function so you can handle merges yourself. The default `merge` function just calls `set`.
 
 Models do not have validation methods (`isValid`/`validate`). Use `parse` instead as a replacement.
 
@@ -21,6 +22,8 @@ false will prevent it from being added to a collection and update the `valid` pr
 Collections can also have a `parse` method which can be used to reject "invalid" models from being added to a collection. Whenever
 `add`/`push`/`set` is called on a collection, the collection's `parse` method will get called and it should return the "new" array that will be 
 added/pushed/set on the collection.
+
+`Model.unset` sets keys on `attributes` to undefined instead of deleting them.
 
 Tabs (instead of spaces) are invalid syntax for the purposes of setting up events in `delegateEvents`
 
