@@ -624,7 +624,7 @@
       var order = !sortable && options.add && options.remove ? [] : false;
       var orderChanged = false;
       var sort = false;
-      var i, l, id, model, existing, attrs;
+      var i, l, id, model, existing, attrs, modelOptions;
 
       // Turn bare objects into model references, and prevent invalid models
       // from being added.
@@ -636,6 +636,9 @@
           id = attrs[this.model.prototype.idAttribute || 'id'];
         }
 
+        // Build new modelOptions each time since parse() might modify reference.
+        modelOptions = _.extend({}, this._modelOptions, options);
+
         // If a duplicate is found, prevent it from being added and
         // optionally merge it into the existing model.
         if (existing = this.get(id)) {
@@ -645,16 +648,16 @@
             if (attrs === model) {
               attrs = model.attributes;
             } else {
-              attrs = this.model.prototype.parse(attrs, options);
+              attrs = this.model.prototype.parse(attrs, modelOptions);
             }
-            existing.merge(attrs, options);
+            existing.merge(attrs, modelOptions);
             if (sortable && !sort && existing.hasChanged(sortAttr)) sort = true;
           }
           newModels[i] = existing;
 
         // If this is a new, valid model, push it to the `toAdd` list.
         } else if (options.add) {
-          model = newModels[i] = this._prepareModel(attrs, options);
+          model = newModels[i] = this._prepareModel(attrs, modelOptions);
           if (!model || !model.valid) continue;
           toAdd.push(model);
           this._addReference(model);
@@ -847,7 +850,7 @@
     // Create a new instance of a model in this collection. Add the model to the
     // collection immediately.
     create: function(modelData, opts) {
-      var options = opts ? _.clone(opts) : {};
+      var options = _.extend({}, this._modelOptions, opts);
       var success = options.success;
       var model = this._prepareModel(modelData, options);
       if (!model) return false;
@@ -874,8 +877,7 @@
     // collection.
     _prepareModel: function(attrs, opts) {
       if (attrs instanceof Model) return attrs;
-      var options = _.extend({}, this._modelOptions, opts);
-      return new this.model(attrs, options);
+      return new this.model(attrs, opts || {});
     },
 
     // Internal method to create a model's ties to a collection.
