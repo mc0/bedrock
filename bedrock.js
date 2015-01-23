@@ -197,6 +197,7 @@
         }
         return this;
       }
+      if (!callback) return this;
       var ran = false, cb;
       cb = function() {
         if (ran) return;
