@@ -1,0 +1,23 @@
+{
+  "name" : "bedrock",
+  "description" : "A simplified, fast framework for Models, Views, Controllers and Events based off Backbone.js",
+  "keywords" : ["model", "view", "controller", "backbone"],
+  "dependencies" : {
+    "underscore" : ">=1.5.0"
+  },
+  "devDependencies": {
+    "phantomjs": "1.9.7-8",
+    "docco": "0.6.3",
+    "coffee-script": "1.7.1"
+  },
+  "scripts": {
+    "test": "phantomjs test/vendor/runner.js test/index.html?noglobals=true && coffee test/model.coffee"
+  },
+  "main" : "bedrock.js",
+  "version" : "1.1.2",
+  "license" : "MIT",
+  "repository" : {
+    "type": "git",
+    "url": "https://github.com/mc0/bedrock.git"
+  }
+}
