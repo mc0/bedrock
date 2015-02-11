@@ -168,7 +168,10 @@
     // receive the true name of the event as the first argument).
     trigger: function(name) {
       if (!this._events || !name) return this;
-      var args = slice.call(arguments, 1);
+      // Ignore the name argument
+      var length = Math.max(0, arguments.length - 1);
+      var args = Array(length);
+      for (var i = 0; i < length; i++) args[i] = arguments[i + 1];
       if (!eventsApi(this, 'trigger', name, args)) return this;
       var events = this._events[name];
       var allEvents = this._events.all;
