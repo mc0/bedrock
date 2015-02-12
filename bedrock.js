@@ -220,12 +220,28 @@
       for (var id in listeningTo) {
         obj = listeningTo[id];
         obj.off(name, callback, this);
-        if (remove || _.isEmpty(obj._events)) delete this._listeningTo[id];
+        if (remove || !eventsLeftForContext(obj, this)) {
+          delete this._listeningTo[id];
+        }
       }
       return this;
     }
 
   };
+
+  // Fix memory leak reported in https://github.com/jashkenas/backbone/issues/3453
+  // Though their fix is probably better, its a lot larger to try and port right now
+  function eventsLeftForContext(obj, ctx) {
+    var i, l, n;
+    for (n in obj._events) {
+      for (i = 0, l = obj._events[n].length; i < l; i++) {
+        if (obj._events[n][i].ctx === ctx) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
 
   // Space literal reference used to split event strings.
   var eventSplitter = ' ';

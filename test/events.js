@@ -165,21 +165,26 @@
     e.trigger("foo");
   });
 
-  test("stopListening cleans up references", 8, function() {
+  test("stopListening cleans up references", 10, function() {
     var a = _.extend({}, Backbone.Events);
     var b = _.extend({}, Backbone.Events);
     var fn = function() {};
-    a.listenTo(b, 'event', fn).stopListening();
+    b.on('other', fn);
+    a.listenTo(b, 'all', fn).stopListening();
     equal(_.size(a._listeningTo), 0);
-    equal(_.size(b._events), 0);
+    equal(_.size(b._events), 1);
     a.listenTo(b, 'event', fn).stopListening(b);
     equal(_.size(a._listeningTo), 0);
-    equal(_.size(b._events), 0);
+    equal(_.size(b._events), 1);
     a.listenTo(b, 'event', fn).stopListening(b, 'event');
     equal(_.size(a._listeningTo), 0);
-    equal(_.size(b._events), 0);
+    equal(_.size(b._events), 1);
     a.listenTo(b, 'event', fn).stopListening(b, 'event', fn);
     equal(_.size(a._listeningTo), 0);
+    a.listenTo(b, 'event', fn).listenTo(b, 'event', fn).stopListening(null, 'event');
+    equal(_.size(a._listeningTo), 0);
+    equal(_.size(b._events), 1);
+    b.off('other', fn);
     equal(_.size(b._events), 0);
   });
 
