@@ -1,12 +1,18 @@
 /**
- * Bedrock.js 1.1.2
+ * Bedrock.js 0.7.0
  *
  * Bedrock.js is a foundation framework for large applications
  * by Mark Caudill and James Hartig.
  *
- * Based on Backbone.js 1.1.2
+ * API originally based off Backbone.js 1.1.2
  * (c) 2010-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
  * Backbone may be freely distributed under the MIT license.
+ *
+ * Notable API differences in README.md
+ *
+ * Version relationships
+ * Bedrock 0.7.x based off Backbone.js 1.1.2
+ *
  */
 
 // The root variable is a reference to the global object
@@ -21,7 +27,7 @@
 
   // Set up Bedrock appropriately for the environment. Start with AMD.
   if (typeof define === 'function' && define.amd) {
-    define(['underscore', 'jquery', 'exports'], function(_, $, exports) {
+    define(['lodash', 'jquery', 'exports'], function(_, $, exports) {
         // Export global even in AMD case in case this script is loaded with
         // others that may still expect a global Bedrock.
         root.Bedrock = factory(root, exports, _, $);
@@ -29,8 +35,8 @@
 
   // Next for Node.js or CommonJS. jQuery may not be needed as a module.
   } else if (typeof exports !== 'undefined') {
-    // Require Underscore if we're on the server and it's not already present.
-    _ = require('underscore');
+    // Require Lodash if we're on the server and it's not already present.
+    _ = require('lodash');
     factory(root, exports, _);
 
   // Finally, as a browser global.
@@ -54,7 +60,7 @@
   var splice = array.splice;
 
   // Current version of the library.
-  Bedrock.VERSION = '1.1.2';
+  Bedrock.VERSION = '0.7.0';
 
   Bedrock.$ = $;
 

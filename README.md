@@ -5,6 +5,10 @@ A simplified, fast framework for Models, Views, Controllers and Events based off
 
 # Differences from Backbone.js
 
+Version 0.7.0 was originally based off of Backbone.js 1.2.1.
+
+Requires [lodash](https://github.com/lodash/lodash) instead of underscore.
+
 `Sync` is removed. No `fetch`/`read`/`sync`/`isNew`/etc on models.
 
 `Model.collection` will never exist.
