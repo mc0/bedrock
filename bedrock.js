@@ -170,7 +170,7 @@
       if (!this._events || !name) return this;
       // Ignore the name argument
       var length = Math.max(0, arguments.length - 1);
-      var args = Array(length);
+      var args = new Array(length);
       for (var i = 0; i < length; i++) args[i] = arguments[i + 1];
       if (!eventsApi(this, 'trigger', name, args)) return this;
       var events = this._events[name];
@@ -531,8 +531,10 @@
   // Mix in each Underscore method as a proxy to `Model#attributes`.
   _.each(modelMethods, function(method) {
     Model.prototype[method] = function() {
-      var args = slice.call(arguments);
-      args.unshift(this.attributes);
+      var args = new Array(arguments.length + 1);
+      args[0] = this.attributes;
+      // We added attributes to args so add one to args index
+      for (var i = 0; i < arguments.length; i++) args[i + 1] = arguments[i];
       return _[method].apply(_, args);
     };
   });
@@ -945,8 +947,10 @@
   // Mix in each Underscore method as a proxy to `Collection#models`.
   _.each(methods, function(method) {
     Collection.prototype[method] = function() {
-      var args = slice.call(arguments);
-      args.unshift(this.models);
+      var args = new Array(arguments.length + 1);
+      args[0] = this.models;
+      // We added models to args so add one to args index
+      for (var i = 0; i < arguments.length; i++) args[i + 1] = arguments[i];
       return _[method].apply(_, args);
     };
   });
@@ -1486,7 +1490,11 @@
     if (protoProps && _.has(protoProps, 'constructor')) {
       child = protoProps.constructor;
     } else {
-      child = function(){ return parent.apply(this, arguments); };
+      child = function() {
+        var args = new Array(arguments.length);
+        for (var i = 0; i < arguments.length; i++) args[i] = arguments[i];
+        return parent.apply(this, args);
+      };
     }
 
     // Add static properties to the constructor function, if supplied.
