@@ -254,6 +254,114 @@
     equal(otherRemoved, null);
   });
 
+  test("move", 27, function() {
+    var col = new Backbone.Collection(),
+        e = new Backbone.Model({id: -1, label: 'e'}),
+        f = new Backbone.Model({id: -2, label: 'f'});
+    col.add([b, c, a]);
+    col.on('move', function(coll, models, index, options) {
+      equal(index, 1);
+      equal(models.length, 3);
+      strictEqual(models[0], b);
+      strictEqual(models[1], c);
+      strictEqual(models[2], d);
+    });
+    col.on('add', function(model, col, options) {
+      equal(options.index, 3);
+      strictEqual(model, d);
+    });
+    col.on('remove', function(model, col, options) {
+      ok(false);
+    });
+    col.move([b, c, d], 3); //a,b,c,d
+    strictEqual(col.at(0), a);
+    strictEqual(col.at(1), b);
+    strictEqual(col.at(2), c);
+    strictEqual(col.at(3), d);
+    equal(col.length, 4);
+
+    col.off('move').on('move', function(coll, models, index, options) {
+      equal(index, 1);
+      equal(models.length, 1);
+      strictEqual(models[0], a);
+    });
+    col.off('add');
+    col.move(a, 2); //b,a,c,d
+    strictEqual(col.at(0), b);
+    strictEqual(col.at(1), a);
+    equal(col.length, 4);
+
+    col.off('move');
+    col.off('add').on('add', function(model, col, options) {
+      if (model === e) equal(options.index, 4);
+      if (model === f) equal(options.index, 5);
+    });
+    col.move([e, f], -1);//b,a,c,d,e,f
+    strictEqual(col.at(4), e);
+    strictEqual(col.at(5), f);
+    equal(col.length, 6);
+
+    col.off('move').on('move', function(coll, models, index, options) {
+      equal(index, 0);
+    });
+    col.off('add').on('add', function(model, col, options) {
+      ok(false);
+    });
+    col.move([b, e], 0);//e,b,a,c,d,e,f
+    strictEqual(col.at(0), b);
+    strictEqual(col.at(1), e);
+    equal(col.length, 6);
+  });
+
+  test("move null", 0, function() {
+    col.parse = function(a) {
+      var b = [];
+      for (var i = 0; i < a.length; i++) {
+        if (a[i]) {
+          b.push(a[i]);
+        }
+      }
+      return b;
+    };
+    col.on('move', function(coll, models, index, options) {
+      ok(false);
+    });
+    col.on('add', function(model, col, options) {
+      ok(false);
+    });
+    col.on('remove', function(model, col, options) {
+      ok(false);
+    });
+    col.move(null, 0);
+  });
+
+  test("move same position", 2, function() {
+    col.on('move', function(coll, models, index, options) {
+      strictEqual(models[0], a);
+      equal(index, 0);
+    });
+    col.on('add', function(model, col, options) {
+      ok(false);
+    });
+    col.on('remove', function(model, col, options) {
+      ok(false);
+    });
+    col.move(a, 0);
+  });
+
+  test("move with nothing", 0, function() {
+    col.on('move', function(coll, models, index, options) {
+      ok(false);
+    });
+    col.on('add', function(model, col, options) {
+      ok(false);
+    });
+    col.on('remove', function(model, col, options) {
+      ok(false);
+    });
+    col.move([]);
+  });
+
   test("shift and pop", 2, function() {
     var col = new Backbone.Collection([{a: 'a'}, {b: 'b'}, {c: 'c'}]);
     equal(col.shift().get('a'), 'a');

@@ -579,9 +579,18 @@
   // Default options for `Collection#set`.
   var setOptions = {add: true, remove: true, merge: true};
   var addOptions = {add: true, remove: false};
+  var moveOptions = {add: true, remove: false, move: true};
 
   // For use in `Collection#toJSON`
   var collectionToJSON = function (model) { return model.toJSON(this); };
+
+  // For use in `Collection#set`
+  var collectionFireAddEvents = function (coll, toAdd, at, addOpts) {
+    for (var i = 0, l = toAdd.length; i < l; i++) {
+      if (at != null) addOpts.index = at + i;
+      toAdd[i].trigger('add', toAdd[i], coll, addOpts);
+    }
+  };
 
   // Define the Collection's inheritable methods.
   _.extend(Collection.prototype, Events, {
@@ -646,13 +655,16 @@
       var newModels = singular ? models : new models.constructor(modelsLen);
       var at = options.at;
       if (at < 0) at += this.length + 1;
+      var firstModelAt = at;
       var sortable = this.comparator && (at == null) && options.sort !== false;
       var sortAttr = _.isString(this.comparator) ? this.comparator : null;
       var toAdd = [], toRemove = [], modelMap = {};
       var order = !sortable && options.add && options.remove ? [] : false;
       var orderChanged = false;
       var sort = false;
-      var i, l, id, model, existing, attrs, modelOptions;
+      var addOpts = at != null ? _.clone(options) : options;
+      var i, l, model, existing, attrs, modelOptions, index, numToAdd;
+
 
       // Turn bare objects into model references, and prevent invalid models
       // from being added.
@@ -669,6 +681,21 @@
         // optionally merge it into the existing model.
         if (existing = this.get(attrs)) {
           if (options.remove) modelMap[existing.cid] = true;
+          if (options.move) {
+            index = this.indexOf(existing);
+            // If we removed something before at, the first model is moving back, otherwise
+            // we need to increase at to the next index to skip over the model we just added.
+            if (index < at) {
+              firstModelAt--;
+              at--;
+            }
+            splice.apply(this.models, [at, 0].concat(toAdd, this.models.splice(index, 1)));
+            numToAdd = toAdd.length;
+            at += numToAdd + 1;
+            this.length += numToAdd;
+            if (!options.silent) collectionFireAddEvents(this, toAdd, at, addOpts);
+            toAdd.length = 0;
+          }
           if (options.merge && attrs !== existing) {
             // If they sent a model then pick the arguments off it.
             if (attrs === model) {
@@ -711,13 +738,17 @@
       }
 
       // See if sorting is needed, update `length` and splice in new models.
-      var numToAdd = toAdd.length;
+      numToAdd = toAdd.length;
       if (numToAdd || orderChanged) {
         if (sortable) sort = true;
         if (at != null && at < this.length) {
           // Splice.apply could hit args limit.
-          for (i = 0; i < numToAdd; i += 5000) {
-            splice.apply(this.models, [at + i, 0].concat(toAdd.slice(i, i + 5000)));
+          if (numToAdd > 5000) {
+            for (i = 0; i < numToAdd; i += 5000) {
+              splice.apply(this.models, [at + i, 0].concat(toAdd.slice(i, i + 5000)));
+            }
+          } else {
+            splice.apply(this.models, [at, 0].concat(toAdd));
           }
         } else {
           if (order) this.models.length = 0;
@@ -733,12 +764,11 @@
       if (sort) this.sort({silent: true});
 
       if (!options.silent) {
-        var addOpts = at != null ? _.clone(options) : options;
         // Trigger `add` events.
-        for (i = 0; i < numToAdd; i++) {
-          model = toAdd[i];
-          if (at != null) addOpts.index = at + i;
-          model.trigger('add', model, this, addOpts);
+        collectionFireAddEvents(this, toAdd, at, addOpts);
+
+        if (options.move && firstModelAt < at + numToAdd) {
+          this.trigger('move', this, this.models.slice(firstModelAt, at + numToAdd), firstModelAt, options);
         }
 
         // Trigger `sort` if the collection was sorted.
@@ -808,15 +838,11 @@
     },
 
     // Move provided models to index.
-    move: function(models, index, opts) {
-      var options = opts || {};
-      if (!_.isArray(models)) models = [models];
-      this.remove(models, _.defaults({silent: true}, options));
-      this.add(models, _.defaults({at: index, silent: true}, options));
-      if (!options.silent) {
-          this.trigger('move', this, models, index, options);
-          this.trigger('reset', this, options);
-      }
+    // `move` event fires with models moved and index of first moved model. Event may
+    // include ones that were not previously in the collection.
+    // `add` event fires for any models that were not previously in the collection.
+    move: function(models, index, options) {
+      return this.set(models, _.extend({at: index, merge: this.mergeOnAdd}, options, moveOptions));
     },
 
     // Return models with matching attributes. Useful for simple cases of
