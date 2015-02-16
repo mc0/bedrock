@@ -67,7 +67,7 @@
     equal(col.get(col.first().cid), col.first());
   });
 
-  test("get with non-default ids", 5, function() {
+  test("get with non-default ids", 7, function() {
     var MongoModel = Backbone.Model.extend({idAttribute: '_id'});
     var model = new MongoModel({_id: 100});
     var col = new Backbone.Collection([model], {model: MongoModel});
@@ -75,6 +75,8 @@
     equal(col.get(model.cid), model);
     equal(col.get(model), model);
     equal(col.get(101), void 0);
+    equal(col.get({_id: 100}), model);
+    equal(col.get({_id: 101}), void 0);
 
     var col2 = new Backbone.Collection();
     col2.model = MongoModel;

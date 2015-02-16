@@ -659,9 +659,7 @@
       for (i = 0, l = modelsLen; i < l; i++) {
         attrs = models[i] || {};
         if (attrs instanceof Model) {
-          id = model = attrs;
-        } else {
-          id = attrs[this.model.prototype.idAttribute || 'id'];
+          model = attrs;
         }
 
         // Build new modelOptions each time since parse() might modify reference.
@@ -669,7 +667,7 @@
 
         // If a duplicate is found, prevent it from being added and
         // optionally merge it into the existing model.
-        if (existing = this.get(id)) {
+        if (existing = this.get(attrs)) {
           if (options.remove) modelMap[existing.cid] = true;
           if (options.merge && attrs !== existing) {
             // If they sent a model then pick the arguments off it.
@@ -799,7 +797,8 @@
     // Get a model from the set by id.
     get: function(obj) {
       if (obj == null) return void 0;
-      return this._byId[obj.id != null ? obj.id : obj.cid || obj];
+      var id = obj[this.model.prototype.idAttribute] || obj.id;
+      return this._byId[obj] || this._byId[id] || this._byId[obj.cid];
     },
 
     // Get the model at the given index.
