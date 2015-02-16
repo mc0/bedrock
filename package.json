@@ -3,7 +3,7 @@
   "description" : "A simplified, fast framework for Models, Views, Controllers and Events based off Backbone.js",
   "keywords" : ["model", "view", "controller", "backbone", "bedrock"],
   "dependencies" : {
-    "lodash" : "2.0.0"
+    "lodash" : "^2.0.0"
   },
   "devDependencies": {
     "phantomjs": "1.9.7-8",
