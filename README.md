@@ -37,7 +37,7 @@ Collections accept `modelOptions` that gets passed along for every model created
 
 `Collection.move` now allows moving models around within a collection; if the models don't exist in the collection, then new models will be added.
 The event `"move" (collection, models, index)` fires for the move and the index sent is the index of the first model in models. For any models
-that were added, an `add` event is fired.
+that were added, an `add` event is fired. An `adds` event will NOT be fired unless nothing was moved, only added.
 
 When cloning on a collection, a custom `comparator` is NOT transferred over to the new collection. A custom `model` is, however.
 

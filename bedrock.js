@@ -626,6 +626,10 @@
       var models = singular ? [m] : _.clone(m);
       var options = opts || {};
       var i, l, index, model;
+      // In order to fire removes we're going to rewrite models
+      // as we go and j is going to keep our position. If a model
+      // is invalid and not actually removed, it won't be written.
+      var j = 0;
       for (i = 0, l = models.length; i < l; i++) {
         model = models[i] = this.get(models[i]);
         if (!model) continue;
@@ -638,7 +642,14 @@
           options.index = index;
           model.trigger('remove', model, this, options);
         }
+        models[j++] = model;
         this._removeReference(model);
+      }
+      // We only need to slice if models array should be smaller, which is
+      // caused by some models not actually getting removed.
+      if (models.length !== j) models = models.slice(0, j);
+      if (!options.silent && j > 0) {
+        this.trigger('removes', this, models, options);
       }
       return singular ? models[0]: models;
     },
@@ -776,8 +787,12 @@
         // Trigger `add` events.
         collectionFireAddEvents(this, toAdd, at, addOpts);
 
+        // Trigger `sort` event or `adds` event.
         if (options.move && didMove) {
           this.trigger('move', this, this.models.slice(firstModelAt, at + numToAdd), firstModelAt, options);
+        } else if (numToAdd > 0) {
+          if (at != null) addOpts.index = at;
+          this.trigger('adds', this, toAdd, addOpts);
         }
 
         // Trigger `sort` if the collection was sorted.
