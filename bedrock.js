@@ -662,6 +662,7 @@
       var order = !sortable && options.add && options.remove ? [] : false;
       var orderChanged = false;
       var sort = false;
+      var didMove = false;
       var addOpts = at != null ? _.clone(options) : options;
       var i, l, model, existing, attrs, modelOptions, index, numToAdd;
 
@@ -690,6 +691,7 @@
               at--;
             }
             splice.apply(this.models, [at, 0].concat(toAdd, this.models.splice(index, 1)));
+            didMove = true;
             numToAdd = toAdd.length;
             at += numToAdd + 1;
             this.length += numToAdd;
@@ -767,7 +769,7 @@
         // Trigger `add` events.
         collectionFireAddEvents(this, toAdd, at, addOpts);
 
-        if (options.move && firstModelAt < at + numToAdd) {
+        if (options.move && didMove) {
           this.trigger('move', this, this.models.slice(firstModelAt, at + numToAdd), firstModelAt, options);
         }
 

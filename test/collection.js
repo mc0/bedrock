@@ -254,23 +254,30 @@
     equal(otherRemoved, null);
   });
 
-  test("move", 27, function() {
+  test("move", 31, function() {
     var col = new Backbone.Collection(),
         e = new Backbone.Model({id: -1, label: 'e'}),
         f = new Backbone.Model({id: -2, label: 'f'});
-    col.add([b, c, a]);
-    col.on('move', function(coll, models, index, options) {
+    col.add([c, a, b]);
+    col.off('move').on('move', function(coll, models, index, options) {
+      equal(index, 0);
+      equal(models.length, 1);
+      strictEqual(models[0], b);
+    });
+    col.move(b, 0);//b,c,a
+    strictEqual(col.at(0), b);
+    col.off('move').on('move', function(coll, models, index, options) {
       equal(index, 1);
       equal(models.length, 3);
       strictEqual(models[0], b);
       strictEqual(models[1], c);
       strictEqual(models[2], d);
     });
-    col.on('add', function(model, col, options) {
+    col.off('add').on('add', function(model, col, options) {
       equal(options.index, 3);
       strictEqual(model, d);
     });
-    col.on('remove', function(model, col, options) {
+    col.off('remove').on('remove', function(model, col, options) {
       ok(false);
     });
     col.move([b, c, d], 3); //a,b,c,d
