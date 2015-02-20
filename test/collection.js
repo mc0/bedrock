@@ -1,6 +1,6 @@
 (function() {
 
-  var a, b, c, d, e, col, otherCol;
+  var a, b, c, d, e, col, otherCol, isLodash;
 
   module("Backbone.Collection", {
 
@@ -12,6 +12,7 @@
       e         = null;
       col       = new Backbone.Collection([a,b,c,d]);
       otherCol  = new Backbone.Collection();
+      isLodash  = _.toString().indexOf('lodash') != -1;
     }
 
   });
@@ -471,15 +472,23 @@
     equal(coll.findWhere({a: 4}), void 0);
   });
 
-  test("Underscore methods", 16, function() {
+  test("Underscore methods", isLodash ? 18 : 16, function() {
     equal(col.map(function(model){ return model.get('label'); }).join(' '), 'a b c d');
     equal(col.any(function(model){ return model.id === 100; }), false);
     equal(col.any(function(model){ return model.id === 0; }), true);
     equal(col.indexOf(b), 1);
     equal(col.size(), 4);
-    equal(col.rest().length, 3);
-    ok(!_.include(col.rest(), a));
-    ok(_.include(col.rest(), d));
+    if (isLodash) {
+      equal(col.drop().length, 3);
+      ok(!_.include(col.take(), d));
+      ok(!_.include(col.takeRight(), a));
+      ok(_.include(col.takeRight(), d));
+      ok(_.include(col.dropRight(), a));
+    } else {
+      equal(col.rest().length, 3);
+      ok(!_.include(col.rest(), a));
+      ok(_.include(col.rest(), d));
+    }
     ok(!col.isEmpty());
     ok(!_.include(col.without(d), d));
     equal(col.max(function(model){ return model.id; }).id, 3);

@@ -1,5 +1,5 @@
 /**
- * Bedrock.js 0.8.1
+ * Bedrock.js 0.8.2
  *
  * Bedrock.js is a foundation framework for large applications
  * by Mark Caudill and James Hartig.
@@ -975,7 +975,9 @@
     'reject', 'every', 'all', 'some', 'any', 'include', 'contains', 'invoke',
     'max', 'min', 'toArray', 'size', 'first', 'head', 'take', 'initial', 'rest',
     'tail', 'drop', 'last', 'without', 'difference', 'indexOf', 'shuffle',
-    'lastIndexOf', 'isEmpty', 'chain', 'sample'];
+    'lastIndexOf', 'isEmpty', 'chain', 'sample','reduceRight', 'forEachRight',
+    'dropWhile', 'dropRight', 'dropRightWhile', 'takeRight', 'takeWhile',
+    'takeRightWhile', 'partition'];
 
   // Mix in each Underscore method as a proxy to `Collection#models`.
   _.each(methods, function(method) {
@@ -989,7 +991,8 @@
   });
 
   // Underscore methods that take a property name as an argument.
-  var attributeMethods = ['groupBy', 'countBy', 'sortBy', 'indexBy'];
+  var attributeMethods = ['groupBy', 'countBy', 'sortBy', 'indexBy',
+    'sortByAll'];
 
   // Use attributes instead of properties.
   _.each(attributeMethods, function(method) {
