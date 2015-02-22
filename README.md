@@ -1,7 +1,9 @@
 bedrock
 =======
 
-A simplified, fast framework for Models, Views, Controllers and Events based off [Backbone.js](https://github.com/jashkenas/backbone)
+A simplified, fast framework for Models, Views, Collections and Events based off [Backbone.js](https://github.com/jashkenas/backbone)
+
+* [Documentation](doc/)
 
 # Differences from Backbone.js
 
@@ -44,6 +46,8 @@ When cloning on a collection, a custom `comparator` is NOT transferred over to t
 `routes` and `defaults` cannot be functions.
 
 Defining a `modelId` is not supported.
+
+`Collection.sort` no longer throws an exception when there is no comparator present.
 
 # Why?
 

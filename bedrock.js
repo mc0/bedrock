@@ -22,8 +22,7 @@
   // Initial Setup
   // -------------
 
-  var $;
-  var _;
+  var $, _;
 
   // Set up Bedrock appropriately for the environment. Start with AMD.
   if (typeof define === 'function' && define.amd) {
@@ -41,7 +40,7 @@
 
   // Finally, as a browser global.
   } else {
-    // For Bedrock's purposes, jQuery, Zepto, Ender, or My Library (kidding) owns
+    // For Bedrock's purposes, jQuery, Zepto, Ender, or jQuery-like library owns
     // the `$` variable.
     $ = root.jQuery || root.Zepto || root.ender || root.$;
     root.Bedrock = factory(root, {}, root._, $);
@@ -49,23 +48,30 @@
 
 // We are making a safe reference to undefined
 }(this, function(root, Bedrock, _, $, undefined) {
+  // Current version of the library.
+  Bedrock.VERSION = '0.8.2';
+
+  Bedrock.$ = $;
 
   // Save the previous value of the `Bedrock` variable, so that it can be
   // restored later on, if `noConflict` is used.
   var previousBedrock = root.Bedrock;
 
-  // Create local references to array methods we'll want to use later.
-  var array = [];
-  var slice = array.slice;
-  var splice = array.splice;
+  // Runs Bedrock.js in *noConflict* mode, returning the `Bedrock` variable
+  // to its previous owner. Returns a reference to this Bedrock object.
+  Bedrock.noConflict = function() {
+    root.Bedrock = previousBedrock;
+    return this;
+  };
 
-  // Current version of the library.
-  Bedrock.VERSION = '0.7.0';
-
-  Bedrock.$ = $;
+  // Create local references to array/object methods we'll want to use later.
+  var Array = root.Array,
+      arrayProto = Array.prototype,
+      splice = arrayProto.splice,
+      hasOwnProperty = {}.hasOwnProperty;
 
   // A noop function for doing nothing
-  var noop = function() {};
+  function noop() {}
 
   // Trim whitespace (simplified)
   var trim = function() {
@@ -80,22 +86,115 @@
     };
   }();
 
-  // Runs Bedrock.js in *noConflict* mode, returning the `Bedrock` variable
-  // to its previous owner. Returns a reference to this Bedrock object.
-  Bedrock.noConflict = function() {
-    root.Bedrock = previousBedrock;
-    return this;
-  };
-
-  var uniqueCIDCount = 1;
+  // Events
+  // -------------
   var uniqueLIDCount = 1;
-  var uniqueViewIDCount = 1;
 
-  // A special object for unsetting in unset and clear
-  var unsetObject = {unset: true};
+  // Fix memory leak reported in https://github.com/jashkenas/backbone/issues/3453
+  // Though their fix is probably better, its a lot larger to try and port right now
+  function eventsLeftForContext(obj, ctx) {
+    var keys = _.keys(obj._events),
+      i = keys.length,
+      n, j;
+    while (i--) {
+      n = keys[i];
+      j = obj._events[n].length;
+      while (j--) {
+        if (obj._events[n][j].ctx === ctx) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
 
-  // Bedrock.Events
-  // ---------------
+  // Space literal reference used to split event strings.
+  var eventSplitter = ' ';
+
+  // Implement fancy features of the Events API such as multiple event
+  // names `"change blur"` and jQuery-style event maps `{change: action}`
+  // in terms of the existing API.
+  function eventsApi(obj, action, name, rest) {
+    if (!name) return true;
+    var keys, key, i, l;
+
+    // Handle event maps.
+    if (typeof name === 'object') {
+      keys = _.keys(name);
+      for (i = 0, l = keys.length; i < l; i++) {
+        key = keys[i];
+        obj[action].apply(obj, [key, name[key]].concat(rest));
+      }
+      return false;
+    }
+
+    // Handle space separated event names.
+    if (name.indexOf(eventSplitter) != -1) {
+      var names = name.split(eventSplitter);
+      // Order matters for this for `trigger`
+      for (i = 0, l = names.length; i < l; i++) {
+        obj[action].apply(obj, [names[i]].concat(rest));
+      }
+      return false;
+    }
+
+    return true;
+  }
+
+  // Used for creating only-call-once functions
+  function onceFactory(name, callback, cleanup) {
+    var ran = false;
+    function once() {
+      if (ran) return;
+      ran = true;
+      cleanup(name, once);
+      callback.apply(this, arguments);
+    }
+    once._callback = callback;
+    return once;
+  }
+
+  // Optimized trigger handling function made to stay speedy
+  function triggerApi(name, args) {
+    if (!name) return;
+    var events = this._events[name],
+      allEvents = this._events.all;
+    if (events) triggerEvents(events, args);
+    if (allEvents) triggerEvents(allEvents, [name].concat(args));
+  }
+
+  // An optimized internal dispatch function for triggering events. Tries to
+  // keep the usual cases speedy (most internal Bedrock events have 3 arguments).
+  function triggerEvents(events, args) {
+    var i = -1,
+      l = events.length,
+      argsLength = args.length,
+      a1 = args[0],
+      a2 = args[1],
+      a3 = args[2],
+      ev;
+    if (argsLength == 0) {
+      while (++i < l) {
+        (ev = events[i]).callback.call(ev.ctx);
+      }
+    } else if (argsLength == 1) {
+      while (++i < l) {
+        (ev = events[i]).callback.call(ev.ctx, a1);
+      }
+    } else if (argsLength == 2) {
+      while (++i < l) {
+        (ev = events[i]).callback.call(ev.ctx, a1, a2);
+      }
+    } else if (argsLength == 3) {
+      while (++i < l) {
+        (ev = events[i]).callback.call(ev.ctx, a1, a2, a3);
+      }
+    } else {
+      while (++i < l) {
+        (ev = events[i]).callback.apply(ev.ctx, args);
+      }
+    }
+  }
 
   // A module that can be mixed in to *any object* in order to provide it with
   // custom events. You may bind with `on` or remove with `off` callback
@@ -104,16 +203,17 @@
   //
   //     var object = {};
   //     _.extend(object, Bedrock.Events);
-  //     object.on('expand', function(){ alert('expanded'); });
+  //     object.on('expand', function() { alert('expanded'); });
   //     object.trigger('expand');
   //
-  var Events = Bedrock.Events = {
+  var Events = {
 
     // Bind an event to a `callback` function. Passing `"all"` will bind
     // the callback to all events fired.
     on: function(name, callback, context) {
-      if (!eventsApi(this, 'on', name, [callback, context]) || !callback) return this;
-      if (this._events === undefined) this._events = {};
+      if (!eventsApi(this, 'on', name, [callback, context])) return this;
+      if (!callback) return this;
+      this._events = this._events || {};
       var events = this._events[name] || (this._events[name] = []);
       events.push({callback: callback, context: context, ctx: context || this});
       return this;
@@ -122,16 +222,9 @@
     // Bind an event to only be triggered a single time. After the first time
     // the callback is invoked, it will be removed.
     once: function(name, callback, context) {
-      if (!eventsApi(this, 'once', name, [callback, context]) || !callback) return this;
-      var self = this;
-      var ran = false;
-      function once() {
-        if (ran) return;
-        ran = true;
-        self.off(name, once);
-        callback.apply(this, arguments);
-      }
-      once._callback = callback;
+      if (!eventsApi(this, 'once', name, [callback, context])) return this;
+      if (!callback) return this;
+      var once = onceFactory(name, callback, _.bind(this.off, this));
       return this.on(name, once, context);
     },
 
@@ -140,28 +233,38 @@
     // callbacks for the event. If `name` is null, removes all bound
     // callbacks for all events.
     off: function(name, callback, context) {
-      var retain, ev, events, names, i, l, j, k;
-      if (!this._events || !eventsApi(this, 'off', name, [callback, context])) return this;
+      var remaining, ev, events, names, i, j, k;
+      if (!this._events) return this;
+      if (!eventsApi(this, 'off', name, [callback, context])) return this;
       if (!name && !callback && !context) {
         this._events = void 0;
         return this;
       }
 
       names = name ? [name] : _.keys(this._events);
-      for (i = 0, l = names.length; i < l; i++) {
+      i = names.length;
+      while (i--) {
         name = names[i];
         if (events = this._events[name]) {
-          this._events[name] = retain = [];
+          remaining = [];
           if (callback || context) {
+            // These events are guaranteed to be in order so use a `for`
             for (j = 0, k = events.length; j < k; j++) {
               ev = events[j];
               if ((callback && callback !== ev.callback && callback !== ev.callback._callback) ||
                   (context && context !== ev.context)) {
-                retain.push(ev);
+                remaining[remaining.length] = ev;
               }
             }
           }
-          if (!retain.length) delete this._events[name];
+
+          // Replace the events array if we have any left; otherwise clean up
+          // the array on _events
+          if (remaining.length) {
+            this._events[name] = remaining;
+          } else {
+            delete this._events[name];
+          }
         }
       }
 
@@ -173,16 +276,14 @@
     // (unless you're listening on `"all"`, which will cause your callback to
     // receive the true name of the event as the first argument).
     trigger: function(name) {
-      if (!this._events || !name) return this;
+      if (!this._events) return this;
       // Ignore the name argument
       var length = Math.max(0, arguments.length - 1);
       var args = new Array(length);
       for (var i = 0; i < length; i++) args[i] = arguments[i + 1];
       if (!eventsApi(this, 'trigger', name, args)) return this;
-      var events = this._events[name];
-      var allEvents = this._events.all;
-      if (events) triggerEvents(events, args);
-      if (allEvents) triggerEvents(allEvents, arguments);
+
+      triggerApi.call(this, name, args);
       return this;
     },
 
@@ -201,21 +302,18 @@
     listenToOnce: function(obj, name, callback) {
       if (typeof name === 'object') {
         // Cannot use eventsApi since we need to call it on this but send obj.
-        for (var event in name) {
+        var keys = _.keys(name),
+            i = keys.length,
+            event;
+        while (i--) {
+          event = keys[i];
           this.listenToOnce(obj, event, name[event]);
         }
         return this;
       }
       if (!callback) return this;
-      var ran = false, cb;
-      cb = function() {
-        if (ran) return;
-        ran = true;
-        this.stopListening(obj, name, cb);
-        callback.apply(this, arguments);
-      };
-      cb._callback = callback;
-      return this.listenTo(obj, name, cb);
+      var once = onceFactory(name, callback, _.bind(this.stopListening, this, obj));
+      return this.listenTo(obj, name, once);
     },
 
     // Tell this object to stop listening to either specific events ... or
@@ -226,7 +324,11 @@
       var remove = !name && !callback;
       if (!callback && typeof name === 'object') callback = this;
       if (obj) (listeningTo = {})[obj._listenId] = obj;
-      for (var id in listeningTo) {
+      var keys = _.keys(listeningTo),
+          i = keys.length,
+          id;
+      while (i--) {
+        id = keys[i];
         obj = listeningTo[id];
         obj.off(name, callback, this);
         if (remove || !eventsLeftForContext(obj, this)) {
@@ -234,77 +336,22 @@
         }
       }
       return this;
-    }
+    },
 
-  };
-
-  // Fix memory leak reported in https://github.com/jashkenas/backbone/issues/3453
-  // Though their fix is probably better, its a lot larger to try and port right now
-  function eventsLeftForContext(obj, ctx) {
-    var i, l, n;
-    for (n in obj._events) {
-      for (i = 0, l = obj._events[n].length; i < l; i++) {
-        if (obj._events[n][i].ctx === ctx) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  // Space literal reference used to split event strings.
-  var eventSplitter = ' ';
-
-  // Implement fancy features of the Events API such as multiple event
-  // names `"change blur"` and jQuery-style event maps `{change: action}`
-  // in terms of the existing API.
-  var eventsApi = function(obj, action, name, rest) {
-    if (!name) return true;
-
-    // Handle event maps.
-    if (typeof name === 'object') {
-      for (var key in name) {
-        obj[action].apply(obj, [key, name[key]].concat(rest));
-      }
-      return false;
-    }
-
-    // Handle space separated event names.
-    if (name.indexOf(eventSplitter) != -1) {
-      var names = name.split(eventSplitter);
-      for (var i = 0, l = names.length; i < l; i++) {
-        obj[action].apply(obj, [names[i]].concat(rest));
-      }
-      return false;
-    }
-
-    return true;
-  };
-
-  // A difficult-to-believe, but optimized internal dispatch function for
-  // triggering events. Tries to keep the usual cases speedy (most internal
-  // Bedrock events have 3 arguments).
-  var triggerEvents = function(events, args) {
-    var ev, i = -1, l = events.length, a1 = args[0], a2 = args[1], a3 = args[2];
-    switch (args.length) {
-      case 0: while (++i < l) (ev = events[i]).callback.call(ev.ctx); return;
-      case 1: while (++i < l) (ev = events[i]).callback.call(ev.ctx, a1); return;
-      case 2: while (++i < l) (ev = events[i]).callback.call(ev.ctx, a1, a2); return;
-      case 3: while (++i < l) (ev = events[i]).callback.call(ev.ctx, a1, a2, a3); return;
-      default: while (++i < l) (ev = events[i]).callback.apply(ev.ctx, args); return;
+    extend: function(object) {
+      _.extend(object, Events);
+      return object;
     }
   };
-
-  // Aliases for backwards compatibility.
-  Events.bind   = Events.on;
-  Events.unbind = Events.off;
 
   // Allow the `Bedrock` object to serve as a global event bus, for folks who
   // want global "pubsub" in a convenient place.
   _.extend(Bedrock, Events);
 
-  // Bedrock.Model
-  // --------------
+  // Model
+  // -------------
+  var uniqueCIDCount = 1,
+      unsetObject = {unset: true}; // A special object for unsetting in unset and clear
 
   // Bedrock **Models** are the basic data object in the framework --
   // frequently representing a row in a table in a database on your server.
@@ -315,33 +362,49 @@
   // is automatically generated and assigned in the attributes.
 
   // Doesn't clone attributes parameter unless done so in parse.
-  var Model = Bedrock.Model = function(attributes, opts) {
-    var options = opts || {};
+  function Model(attributes, opts) {
     this.cid = 'c' + (uniqueCIDCount++);
-    var validAttrs = this.parse(attributes, options);
-    var attrs = validAttrs || {};
-    if (validAttrs === false) this.valid = false;
-    if (this.defaults) attrs = _.defaults({}, attrs, this.defaults);
-    if (attrs.hasOwnProperty(this.idAttribute)) this.id = attrs[this.idAttribute];
+    var options = opts || {},
+        validAttrs = this.parse(attributes, options),
+        attrs = validAttrs || {};
+
+    if (validAttrs === false) {
+      this.valid = false;
+    }
+    if (this.defaults) {
+      attrs = _.defaults({}, attrs, this.defaults);
+    }
+    if (hasOwnProperty.call(attrs, this.idAttribute)) {
+      this.id = attrs[this.idAttribute];
+    }
+
     this.attributes = attrs;
     this._previousAttributes = null;
     this.changed = {};
     this.initialize.call(this, attrs, options);
-  };
+  }
 
   // Attach all inheritable methods to the Model prototype.
   _.extend(Model.prototype, Events, {
-
-    // A hash of attributes whose current and previous value differ.
-    changed: null,
+    // The identifier for this model that usually derrived from `idAttribute`.
+    id: undefined,
 
     // The default name for the JSON `id` attribute is `"id"`. MongoDB and
     // CouchDB users may want to set this to `"_id"`.
     idAttribute: 'id',
 
+    // A hash of attributes whose current and previous value differ.
+    changed: null,
+
     // If the parse method returned false then the model is not valid and
     // this would be set to false. It will not be added to a collection.
     valid: true,
+
+    // Clone attributes by default. Override it with your own logic to clean
+    // up and rename attributes.
+    parse: function(attributes, options) {
+      return (options && options.clone === false) ? attributes : _.clone(attributes);
+    },
 
     // Initialize is an empty function by default. Override it with your own
     // initialization logic.
@@ -350,12 +413,6 @@
     // Return a copy of the model's `attributes` object.
     toJSON: function() {
       return _.clone(this.attributes);
-    },
-
-    // Clone attributes by default. Override it with your own logic to clean
-    // up and rename attributes.
-    parse: function(attributes, options) {
-      return (options && options.clone === false) ? attributes : _.clone(attributes);
     },
 
     // Get the value of an attribute.
@@ -383,20 +440,20 @@
     // Set a hash of model attributes on the object, firing `"change"`. This is
     // the core primitive operation of a model, updating the data and notifying
     // anyone who needs to know about the change in state. The heart of the beast.
-    set: function(key, val, opts) {
-      var attr, attrs, unset, changes, silent, changing, prev, current;
-      var options, changed, attrDiffers;
+    set: function(key, valOrOpts, opts) {
+      var val, attr, attrs, unset, changes, silent, changing, prev, current,
+          options, changed, attrDiffers;
       if (key == null || key === false) return this;
 
       // Fast-track for handling .unset and .clear
-      unset = opts === unsetObject && (options = (val || {}));
+      unset = opts === unsetObject && (options = (valOrOpts || {}));
 
       // Handle both `"key", value` and `{key: value}` -style arguments.
       if (typeof key === 'object') {
         attrs = key;
-        options = val;
+        options = valOrOpts;
       } else {
-        (attrs = {})[key] = val;
+        (attrs = {})[key] = valOrOpts;
       }
 
       options = options || opts || {};
@@ -415,10 +472,12 @@
       current = this.attributes;
       changed = this.changed;
       prev = this._previousAttributes;
-      val = undefined;
 
       // For each `set` attribute, update or delete the current value.
-      for (attr in attrs) {
+      var keys = _.keys(attrs),
+          attrPos = keys.length;
+      while (attrPos--) {
+        attr = keys[attrPos];
         if (!unset) val = attrs[attr];
         attrDiffers = !_.isEqual(current[attr], val);
         if (attrDiffers) {
@@ -436,7 +495,7 @@
         } else if (attrDiffers) {
           changed[attr] = val;
         }
-        if (!changing || !prev.hasOwnProperty(attr)) prev[attr] = current[attr];
+        if (!changing || !hasOwnProperty.call(prev, attr)) prev[attr] = current[attr];
         current[attr] = val;
       }
 
@@ -477,7 +536,7 @@
     // If you specify an attribute name, determine if that attribute has changed.
     hasChanged: function(attr) {
       if (attr == null) return !_.isEmpty(this.changed);
-      return _.has(this.changed, attr);
+      return hasOwnProperty.call(this.changed, attr);
     },
 
     // Return an object containing all the attributes that have changed, or
@@ -488,12 +547,17 @@
     // determining if there *would be* a change.
     changedAttributes: function(diff) {
       if (!diff) return this.hasChanged() ? _.clone(this.changed) : false;
-      var val, changed = false, changing = this._changing;
-      var old = this._previousAttributes;
-      var current = this.attributes;
-      for (var attr in diff) {
+      var changed = false,
+          changing = this._changing,
+          old = this._previousAttributes,
+          current = this.attributes,
+          keys = _.keys(diff),
+          i = keys.length,
+          attr, val;
+      while (i--) {
+        attr = keys[i];
         val = diff[attr];
-        if (changing && old.hasOwnProperty(attr) && _.isEqual(old[attr], val)) continue;
+        if (changing && hasOwnProperty.call(old, attr) && _.isEqual(old[attr], val)) continue;
         if (_.isEqual(current[attr], val)) continue;
         (changed || (changed = {}))[attr] = val;
       }
@@ -505,7 +569,7 @@
     previous: function(attr) {
       if (attr == null || this._previousAttributes == null) return null;
       // If it wasn't changed in the last set, then we can just return the current.
-      return this._previousAttributes.hasOwnProperty(attr) ?
+      return hasOwnProperty.call(this._previousAttributes, attr) ?
         this._previousAttributes[attr] : this.attributes[attr];
     },
 
@@ -531,11 +595,20 @@
 
   });
 
-  // Underscore methods that we want to implement on the Model.
-  var modelMethods = ['keys', 'values', 'pairs', 'invert', 'pick', 'omit'];
+  // lodash methods that we want to implement on the Model.
+  var modelMethods = [
+    'keys', 'values', 'pairs',
+    'invert', 'pick', 'omit',
+    'result'
+  ];
 
-  // Mix in each Underscore method as a proxy to `Model#attributes`.
+  // Mix in each lodash method as a proxy to `Model#attributes`.
   _.each(modelMethods, function(method) {
+    // Remove any unsupported methods for custom lodash builds
+    if (!_[method]) {
+      return;
+    }
+
     Model.prototype[method] = function() {
       var args = new Array(arguments.length + 1);
       args[0] = this.attributes;
@@ -545,8 +618,52 @@
     };
   });
 
-  // Bedrock.Collection
-  // -------------------
+  // Collection
+  // -------------
+  // Default options for `Collection#set`.
+  var setOptions = {add: true, remove: true, merge: true},
+      addOptions = {add: true, remove: false},
+      moveOptions = {add: true, remove: false, move: true};
+
+  // For use in `Collection#toJSON`
+  function collectionToJSON(model) {
+    return model.toJSON(this);
+  }
+
+  // For use in `Collection#set`
+  function collectionFireAddEvents(coll, toAdd, at, addOpts) {
+    for (var i = 0, l = toAdd.length; i < l; i++) {
+      if (at != null) addOpts.index = at + i;
+      toAdd[i].trigger('add', toAdd[i], coll, addOpts);
+    }
+  }
+
+  function collectionAddAndOrder(toAdd, at, order) {
+    var i, l, orderedModels, initial;
+    if (at != null && at < this.length) {
+      // Splice.apply could hit args limit.
+      l = toAdd.length;
+      if (l > 5000) {
+        initial = new Array(2);
+        initial[0] = at;
+        initial[1] = 0;
+        for (i = 0; i < l; i += 5000) {
+          initial = at + i;
+          splice.apply(this.models, initial.concat(toAdd.slice(i, i + 5000)));
+        }
+      } else {
+        splice.apply(this.models, [at, 0].concat(toAdd));
+      }
+    } else {
+      if (order) {
+        this.models.length = 0;
+      }
+      orderedModels = order || toAdd;
+      for (i = 0, l = orderedModels.length; i < l; i++) {
+        this.models.push(orderedModels[i]);
+      }
+    }
+  }
 
   // If models tend to represent a single row of data, a Bedrock Collection is
   // more analagous to a table full of data ... or a small slice or page of that
@@ -558,52 +675,44 @@
   // Create a new **Collection**, perhaps to contain a specific type of `model`.
   // If a `comparator` is specified, the Collection will maintain
   // its models in sort order, as they're added and removed.
-  var Collection = Bedrock.Collection = function(models, opts) {
-    var options = opts || {};
-    var model = options.model;
-    if (model) this.model = model;
-    var comparator = options.comparator;
-    if (comparator !== undefined) this.comparator = comparator;
-    var modelOptions = options.modelOptions;
-    if (modelOptions !== undefined) this._modelOptions = modelOptions;
+  function Collection(models, opts) {
+    var options = opts || {},
+        model = options.model,
+        comparator = options.comparator,
+        modelOptions = options.modelOptions;
+
+    if (model) {
+      this.model = model;
+    }
+    if (comparator !== undefined) {
+      this.comparator = comparator;
+    }
+    if (modelOptions !== undefined) {
+      this._modelOptions = modelOptions;
+    }
+
     if (models) {
       this.reset(models, _.extend({silent: true}, options));
     } else {
       this.models = [];
       this._byId  = {};
     }
+
     if (options.mergeOnAdd !== undefined) this.mergeOnAdd = !!options.mergeOnAdd;
     this.initialize(models, options);
-  };
-
-  // Default options for `Collection#set`.
-  var setOptions = {add: true, remove: true, merge: true};
-  var addOptions = {add: true, remove: false};
-  var moveOptions = {add: true, remove: false, move: true};
-
-  // For use in `Collection#toJSON`
-  var collectionToJSON = function (model) { return model.toJSON(this); };
-
-  // For use in `Collection#set`
-  var collectionFireAddEvents = function (coll, toAdd, at, addOpts) {
-    for (var i = 0, l = toAdd.length; i < l; i++) {
-      if (at != null) addOpts.index = at + i;
-      toAdd[i].trigger('add', toAdd[i], coll, addOpts);
-    }
-  };
+  }
 
   // Define the Collection's inheritable methods.
   _.extend(Collection.prototype, Events, {
 
-    // The default model for a collection is just a **Bedrock.Model**.
-    // This should be overridden in most cases.
+    // The default model for a collection is just a **Model**.
     model: Model,
 
     // Initialize is an empty function by default. Override it with your own
     // initialization logic.
     initialize: noop,
 
-    // The default length of 0
+    // There are no models initially so we have a length of 0
     length: 0,
 
     // Should we default to merging when add() is called
@@ -622,14 +731,14 @@
 
     // Remove a model, or a list of models from the set.
     remove: function(m, opts) {
-      var singular = !_.isArray(m);
-      var models = singular ? [m] : _.clone(m);
-      var options = opts || {};
-      var i, l, index, model;
+      var singular = !_.isArray(m),
+          models = singular ? [m] : _.clone(m),
+          options = opts || {},
+          i, j, l, index, model;
       // In order to fire removes we're going to rewrite models
       // as we go and j is going to keep our position. If a model
       // is invalid and not actually removed, it won't be written.
-      var j = 0;
+      j = 0;
       for (i = 0, l = models.length; i < l; i++) {
         model = models[i] = this.get(models[i]);
         if (!model) continue;
@@ -659,23 +768,27 @@
     // already exist in the collection, as necessary. Similar to **Model#set**,
     // the core operation for updating the data contained by the collection.
     set: function(m, opts) {
-      var options = _.defaults({}, opts, setOptions);
-      var singular = !_.isArray(m);
-      var models = this.parse(singular ? (m ? [m] : []) : m, options);
-      var modelsLen = models.length;
-      var newModels = singular ? models : new models.constructor(modelsLen);
-      var at = options.at;
+      var options = _.defaults({}, opts, setOptions),
+          at = options.at;
+
       if (at < 0) at += this.length + 1;
-      var firstModelAt = at;
-      var sortable = this.comparator && (at == null) && options.sort !== false;
-      var sortAttr = _.isString(this.comparator) ? this.comparator : null;
-      var toAdd = [], toRemove = [], modelMap = {};
-      var order = !sortable && options.add && options.remove ? [] : false;
-      var orderChanged = false;
-      var sort = false;
-      var didMove = false;
-      var addOpts = at != null ? _.clone(options) : options;
-      var i, l, model, existing, attrs, modelOptions, index, numToAdd;
+
+      var singular = !_.isArray(m),
+          models = this.parse(singular ? (m ? [m] : []) : m, options),
+          modelsLen = models.length,
+          newModels = singular ? models : new models.constructor(modelsLen),
+          firstModelAt = at,
+          sortable = this.comparator && (at == null) && options.sort !== false,
+          sortAttr = _.isString(this.comparator) ? this.comparator : null,
+          sort = false,
+          order = !sortable && options.add && options.remove ? [] : false,
+          orderChanged = false,
+          didMove = false,
+          toAdd = [],
+          toRemove = [],
+          modelMap = {},
+          addOpts = at != null ? _.clone(options) : options,
+          i, l, model, existing, attrs, modelOptions, index, numToAdd;
 
 
       // Turn bare objects into model references, and prevent invalid models
@@ -761,22 +874,7 @@
       numToAdd = toAdd.length;
       if (numToAdd || orderChanged) {
         if (sortable) sort = true;
-        if (at != null && at < this.length) {
-          // Splice.apply could hit args limit.
-          if (numToAdd > 5000) {
-            for (i = 0; i < numToAdd; i += 5000) {
-              splice.apply(this.models, [at + i, 0].concat(toAdd.slice(i, i + 5000)));
-            }
-          } else {
-            splice.apply(this.models, [at, 0].concat(toAdd));
-          }
-        } else {
-          if (order) this.models.length = 0;
-          var orderedModels = order || toAdd;
-          for (i = 0, l = orderedModels.length; i < l; i++) {
-            this.models.push(orderedModels[i]);
-          }
-        }
+        collectionAddAndOrder.call(this, toAdd, at, order);
         this.length += numToAdd;
       }
 
@@ -806,8 +904,9 @@
     // any granular `add` or `remove` events. Fires `reset` when finished.
     // Useful for bulk operations and optimizations.
     reset: function(resetModels, opts) {
-      var options = _.extend({}, opts);
-      for (var i = 0, l = this.length; i < l; i++) {
+      var options = _.extend({}, opts),
+        i = this.length;
+      while (i--) {
         this._removeReference(this.models[i]);
       }
       options.previousModels = this.models;
@@ -815,7 +914,9 @@
       this.models = [];
       this._byId  = {};
       var models = this.add(resetModels, _.extend({silent: true}, options));
-      if (!options.silent) this.trigger('reset', this, options);
+      if (!options.silent) {
+        this.trigger('reset', this, options);
+      }
       return models;
     },
 
@@ -859,7 +960,9 @@
 
     // Get the model at the given index.
     at: function(index) {
-      if (index < 0) index += this.length;
+      if (index < 0) {
+        return this.models[index + this.length];
+      }
       return this.models[index];
     },
 
@@ -875,9 +978,15 @@
     // `filter`.
     where: function(attrs, first) {
       if (_.isEmpty(attrs)) return first ? void 0 : [];
+      var keys = _.keys(attrs);
       return this[first ? 'find' : 'filter'](function(model) {
-        for (var key in attrs) {
-          if (attrs[key] !== model.get(key)) return false;
+        var i = keys.length,
+            key;
+        while (i--) {
+          key = keys[i];
+          if (attrs[key] !== model.get(key)) {
+            return false;
+          }
         }
         return true;
       });
@@ -893,7 +1002,10 @@
     // normal circumstances, as the set will maintain sort order as each item
     // is added.
     sort: function(options) {
-      if (!this.comparator) throw new Error('Cannot sort a set without a comparator');
+      if (options && options.comparator) {
+        this.comparator = options.comparator;
+      }
+      if (!this.comparator) return this;
 
       // Run sort based on type of `comparator`.
       if (_.isString(this.comparator) || this.comparator.length === 1) {
@@ -991,7 +1103,7 @@
 
   });
 
-  // Underscore methods that we want to implement on the Collection.
+  // lodash methods that we want to implement on the Collection.
   // 90% of the core usefulness of Bedrock Collections is actually implemented
   // right here:
   var methods = ['forEach', 'each', 'map', 'collect', 'reduce', 'foldl',
@@ -1003,8 +1115,13 @@
     'dropWhile', 'dropRight', 'dropRightWhile', 'takeRight', 'takeWhile',
     'takeRightWhile', 'partition'];
 
-  // Mix in each Underscore method as a proxy to `Collection#models`.
+  // Mix in each lodash method as a proxy to `Collection#models`.
   _.each(methods, function(method) {
+    // Remove any unsupported methods for custom lodash builds
+    if (!_[method]) {
+      return;
+    }
+
     Collection.prototype[method] = function() {
       var args = new Array(arguments.length + 1);
       args[0] = this.models;
@@ -1014,12 +1131,18 @@
     };
   });
 
-  // Underscore methods that take a property name as an argument.
-  var attributeMethods = ['groupBy', 'countBy', 'sortBy', 'indexBy',
-    'sortByAll'];
+  // lodash methods that take a property name as an argument.
+  var attributeMethods = [
+    'groupBy', 'countBy', 'sortBy', 'indexBy', 'sortByAll'
+  ];
 
   // Use attributes instead of properties.
   _.each(attributeMethods, function(method) {
+    // Remove any unsupported methods for custom lodash builds
+    if (!_[method]) {
+      return;
+    }
+
     Collection.prototype[method] = function(value, context) {
       var iterator = _.isFunction(value) ? value : function(model) {
         return model.get(value);
@@ -1028,8 +1151,13 @@
     };
   });
 
-  // Bedrock.View
+  // View
   // -------------
+  var uniqueViewIDCount = 1,
+      viewOptions = [
+        'model', 'collection', 'el', 'id', 'attributes', 'className',
+        'tagName', 'events'
+      ];
 
   // Bedrock Views are almost more convention than they are actual code. A View
   // is simply a JavaScript object that represents a logical chunk of UI in the
@@ -1039,9 +1167,9 @@
   // having to worry about render order ... and makes it easy for the view to
   // react to specific changes in the state of your models.
 
-  // Creating a Bedrock.View creates its initial element outside of the DOM,
+  // Creating a `View` creates its initial element outside of the DOM,
   // if an existing element is not provided...
-  var View = Bedrock.View = function(opts) {
+  function View(opts) {
     this.cid = 'view' + (uniqueViewIDCount++);
 
     var options = opts || {};
@@ -1058,19 +1186,17 @@
     this.setElement(el || this.el, false);
     this.initialize(options);
     this.delegateEvents();
-  };
+  }
 
-  // List of view options to be merged as properties.
-  var viewOptions = ['model', 'collection', 'el', 'id', 'attributes', 'className', 'tagName', 'events'];
-
-  // Set up all inheritable **Bedrock.View** properties and methods.
+  // Set up all inheritable **View** properties and methods.
   _.extend(View.prototype, Events, {
 
     // The default `tagName` of a View's element is `"div"`.
     tagName: 'div',
 
     // jQuery delegate for element lookup, scoped to DOM elements within the
-    // current view. This should be preferred to global lookups where possible.
+    // current view. This should be preferred over global DOM searches
+    // whenever possible.
     $: function(selector) {
       return this.$el.find(selector);
     },
@@ -1087,7 +1213,7 @@
     },
 
     // Remove this view by taking the element out of the DOM, and removing any
-    // applicable Bedrock.Events listeners.
+    // applicable event listeners.
     remove: function() {
       this.$el.remove();
       this.stopListening();
@@ -1121,38 +1247,43 @@
     // not `change`, `submit`, and `reset` in Internet Explorer.
     delegateEvents: function(events) {
       if (!(events || (events = this.events))) return this;
-      var method, pos, curPos, eventName, selector;
+      var keys = _.keys(events),
+          i = keys.length,
+          method, key, pos, curPos, eventName, selector;
       this.undelegateEvents();
-      for (var key in events) {
-        method = events[key];
-        if (!_.isFunction(method)) method = this[events[key]];
-        if (!method) continue;
+      while(i--) {
+        key = keys[i];
+        if (hasOwnProperty.call(events, key)) {
+          method = events[key];
+          if (!_.isFunction(method)) method = this[events[key]];
+          if (!method) continue;
 
-        // Find where to split the string into eventName and selector
-        // then trim the selector.
-        pos = 0;
-        eventName = '';
-        selector = '';
-        while (pos < key.length) {
-          curPos = key.indexOf(' ', pos);
-          if (curPos == -1 && pos == 0) {
-            eventName = key;
-            break;
+          // Find where to split the string into eventName and selector
+          // then trim the selector.
+          pos = 0;
+          eventName = '';
+          selector = '';
+          while (pos < key.length) {
+            curPos = key.indexOf(' ', pos);
+            if (curPos == -1 && pos == 0) {
+              eventName = key;
+              break;
+            }
+            if (curPos - pos > 1) {
+              eventName = eventName || key.substring(pos, curPos);
+              selector = trim(key.substring(curPos + 1));
+              break;
+            }
+            pos = curPos + 1;
           }
-          if (curPos - pos > 1) {
-            eventName = eventName || key.substring(pos, curPos);
-            selector = trim(key.substring(curPos + 1));
-            break;
-          }
-          pos = curPos + 1;
-        }
 
-        eventName = (eventName || key) + '.delegateEvents' + this.cid;
-        method = _.bind(method, this);
-        if (selector === '') {
-          this.$el.on(eventName, method);
-        } else {
-          this.$el.on(eventName, selector, method);
+          eventName = (eventName || key) + '.delegateEvents' + this.cid;
+          method = _.bind(method, this);
+          if (selector === '') {
+            this.$el.on(eventName, method);
+          } else {
+            this.$el.on(eventName, selector, method);
+          }
         }
       }
       return this;
@@ -1169,9 +1300,11 @@
     // Create a DOM element on the View to render into from the `id`,
     // `className` and `tagName` properties.
     _createElement: function() {
-      var attrs = this.attributes;
-      if (this.className || this.id) attrs = _.defaults({'class': this.className, 'id': this.id}, attrs);
-      var $el = Bedrock.$('<' + this.tagName + '>');
+      var attrs = this.attributes,
+          $el = Bedrock.$('<' + this.tagName + '>');
+      if (this.className || this.id) {
+        attrs = _.defaults({'class': this.className, 'id': this.id}, attrs);
+      }
       if (attrs) {
           $el.attr(attrs);
       }
@@ -1180,26 +1313,28 @@
 
   });
 
-  // Bedrock.Router
-  // ---------------
-
-  // Routers map faux-URLs to actions, and fire events when routes are
-  // matched. Creating a new one sets its `routes` hash, if not set statically.
-  var Router = Bedrock.Router = function(opts) {
-    var options = opts || {};
-    if (options.routes) this.routes = options.routes;
-    this._bindRoutes();
-    this.initialize.apply(this, arguments);
-  };
-
+  // Router
+  // -------------
   // Cached regular expressions for matching named param parts and splatted
   // parts of route strings.
-  var optionalParam = /\((.*?)\)/g;
-  var namedParam    = /(\(\?)?:\w+/g;
-  var splatParam    = /\*\w+/g;
-  var escapeRegExp  = /[\-{}\[\]+?.,\\\^$|#\s]/g;
+  var optionalParam = /\((.*?)\)/g,
+      namedParam    = /(\(\?)?:\w+/g,
+      splatParam    = /\*\w+/g,
+      escapeRegExp  = /[\-{}\[\]+?.,\\\^$|#\s]/g;
 
-  // Set up all inheritable **Bedrock.Router** properties and methods.
+  function namedOptionalSwap(match, optional) {
+    return optional ? match : '([^/?]+)';
+  }
+
+  // Routers map dispatcher URLs to actions, and fire events when routes are
+  // matched. Creating a new one sets its `routes` hash, if not set statically.
+  function Router(opts) {
+    if (opts && opts.routes) this.routes = opts.routes;
+    this._bindRoutes();
+    this.initialize.apply(this, arguments);
+  }
+
+  // Set up all inheritable **Router** properties and methods.
   _.extend(Router.prototype, Events, {
 
     // Initialize is an empty function by default. Override it with your own
@@ -1234,7 +1369,9 @@
     // Execute a route handler with the provided parameters.  This is an
     // excellent place to do pre-route setup or post-route cleanup.
     execute: function(callback, args) {
-      if (callback) callback.apply(this, args);
+      if (callback) {
+        callback.apply(this, args);
+      }
     },
 
     // Simple proxy to `Bedrock.history` to save a fragment into the history.
@@ -1257,13 +1394,11 @@
     // Convert a route string into a regular expression, suitable for matching
     // against the current location hash.
     _routeToRegExp: function(route) {
-      route = route.replace(escapeRegExp, '\\$&')
-                   .replace(optionalParam, '(?:$1)?')
-                   .replace(namedParam, function(match, optional) {
-                     return optional ? match : '([^/?]+)';
-                   })
-                   .replace(splatParam, '([^?]*?)');
-      return new RegExp('^' + route + '(?:\\?([\\s\\S]*))?$');
+      var routeMatch = route.replace(escapeRegExp, '\\$&')
+        .replace(optionalParam, '(?:$1)?')
+        .replace(namedParam, namedOptionalSwap)
+        .replace(splatParam, '([^?]*?)');
+      return new RegExp('^' + routeMatch + '(?:\\?([\\s\\S]*))?$');
     },
 
     // Given a route, and a URL fragment that it matches, return the array of
@@ -1280,25 +1415,8 @@
 
   });
 
-  // Bedrock.History
-  // ----------------
-
-  // Handles cross-browser history management, based on either
-  // [pushState](http://diveintohtml5.info/history.html) and real URLs, or
-  // [onhashchange](https://developer.mozilla.org/en-US/docs/DOM/window.onhashchange)
-  // and URL fragments. If the browser supports neither (old IE, natch),
-  // falls back to polling.
-  var History = Bedrock.History = function() {
-    this.handlers = [];
-    _.bindAll(this, 'checkUrl');
-
-    // Ensure that `History` can be used outside of the browser.
-    if (typeof window !== 'undefined') {
-      this.location = window.location;
-      this.history = window.history;
-    }
-  };
-
+  // History
+  // -------------
   // Cached regex for stripping a leading hash/slash and trailing space.
   var routeStripper = /^[#\/]|\s+$/g;
 
@@ -1314,14 +1432,30 @@
   // Cached regex for stripping urls of hash.
   var pathStripper = /#.*$/;
 
+  // Handles cross-browser history management, based on either
+  // [pushState](http://diveintohtml5.info/history.html) and real URLs, or
+  // [onhashchange](https://developer.mozilla.org/en-US/docs/DOM/window.onhashchange)
+  // and URL fragments. If the browser supports neither (old IE, natch),
+  // falls back to polling.
+  function History() {
+    this.handlers = [];
+    _.bindAll(this, 'checkUrl');
+
+    // Ensure that `History` can be used outside of the browser.
+    if (typeof window !== 'undefined') {
+      this.location = window.location;
+      this.history = window.history;
+    }
+  }
+
   // Has the history handling already been started?
   History.started = false;
 
-  // Set up all inheritable **Bedrock.History** properties and methods.
+  // Set up all inheritable **History** properties and methods.
   _.extend(History.prototype, Events, {
 
-    // The default interval to poll for hash changes, if necessary, is
-    // twenty times a second.
+    // The default interval to poll for hash changes if necessary. Defaults
+    // to 20 times per second (50ms).
     interval: 50,
 
     // Are we at the app root?
@@ -1359,17 +1493,22 @@
 
       // Figure out the initial configuration. Do we need an iframe?
       // Is pushState desired ... is it available?
-      this.options          = _.extend({root: '/'}, this.options, options);
-      this.root             = this.options.root;
+      var fragment = this.getFragment(),
+          docMode = document.documentMode,
+          oldIE = (isExplorer.exec(navigator.userAgent.toLowerCase()) && (!docMode || docMode <= 7)),
+          loc = this.location;
+      this.options = _.extend({root: '/'}, this.options, options);
+      this.root = this.options.root;
       this._wantsHashChange = this.options.hashChange !== false;
-      this._wantsPushState  = !!this.options.pushState;
-      this._hasPushState    = !!(this.options.pushState && this.history && this.history.pushState);
-      var fragment          = this.getFragment();
-      var docMode           = document.documentMode;
-      var oldIE             = (isExplorer.exec(navigator.userAgent.toLowerCase()) && (!docMode || docMode <= 7));
+      this._wantsPushState = !!this.options.pushState;
+      this._hasPushState = !!(this.options.pushState && this.history && this.history.pushState);
 
       // Normalize root to always include a leading and trailing slash.
       this.root = ('/' + this.root + '/').replace(rootStripper, '/');
+
+      // Determine if we need to change the base url, for a pushState link
+      // opened by a non-pushState browser.
+      this.fragment = fragment;
 
       if (oldIE && this._wantsHashChange) {
         var frame = Bedrock.$('<iframe src="javascript:0" tabindex="-1">');
@@ -1386,11 +1525,6 @@
       } else if (this._wantsHashChange) {
         this._checkUrlInterval = setInterval(this.checkUrl, this.interval);
       }
-
-      // Determine if we need to change the base url, for a pushState link
-      // opened by a non-pushState browser.
-      this.fragment = fragment;
-      var loc = this.location;
 
       // Transition from hashChange to pushState or vice versa if both are
       // requested.
@@ -1413,7 +1547,9 @@
 
       }
 
-      if (this.options.silent) return;
+      if (this.options.silent) {
+        return;
+      }
 
       return this.loadUrl();
     },
@@ -1423,7 +1559,9 @@
     stop: function() {
       Bedrock.$(window).off('popstate', this.checkUrl).off('hashchange', this.checkUrl);
       // Some environments will throw when clearing an undefined interval.
-      if (this._checkUrlInterval) clearInterval(this._checkUrlInterval);
+      if (this._checkUrlInterval) {
+        clearInterval(this._checkUrlInterval);
+      }
       History.started = false;
     },
 
@@ -1440,8 +1578,14 @@
       if (current === this.fragment && this.iframe) {
         current = this.getFragment(this.getHash(this.iframe));
       }
-      if (current === this.fragment) return false;
-      if (this.iframe) this.navigate(current);
+
+      if (current === this.fragment) {
+        return false;
+      }
+
+      if (this.iframe) {
+        this.navigate(current);
+      }
       this.loadUrl();
     },
 
@@ -1449,7 +1593,8 @@
     // match, returns `true`. If no defined routes matches the fragment,
     // returns `false`.
     loadUrl: function(fragmentOverride) {
-      var fragment = this.fragment = this.getFragment(fragmentOverride);
+      var fragment = this.getFragment(fragmentOverride);
+      this.fragment = fragment;
       return _.any(this.handlers, function(handler) {
         if (handler.route.test(fragment)) {
           handler.callback(fragment);
@@ -1469,8 +1614,8 @@
       if (!History.started) return false;
       if (!options || options === true) options = {trigger: !!options};
 
-      var fragment = this.getFragment(frag || '');
-      var url = this.root + fragment;
+      var fragment = this.getFragment(frag || ''),
+          url = this.root + fragment;
 
       // Strip the hash for matching.
       fragment = fragment.replace(pathStripper, '');
@@ -1522,38 +1667,32 @@
   // Create the default Bedrock.history.
   Bedrock.history = new History;
 
-  var objCreate = Object.create;
-  if (!objCreate) {
-    //poly-fill from https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/create
-    objCreate = (function(){
-      function F(){}
-      return function(o) {
-        F.prototype = o;
-        return new F();
-      };
-    })();
-  }
-
   // Helpers
   // -------
+  var objCreate = function() {
+    function TempParentObj() {}
+
+    return Object.create || function(protoObj) {
+      TempParentObj.prototype = protoObj;
+      return new TempParentObj();
+    };
+  }();
 
   // Helper function to correctly set up the prototype chain, for subclasses.
   // Similar to `goog.inherits`, but uses a hash of prototype properties and
   // class properties to be extended.
-  var extend = function(protoProps, staticProps) {
-    var parent = this;
-    var child;
+  function extend(prototypeProps, staticProps) {
+    var parent = this,
+        child;
 
     // The constructor function for the new subclass is either defined by you
     // (the "constructor" property in your `extend` definition), or defaulted
     // by us to simply call the parent's constructor.
-    if (protoProps && _.has(protoProps, 'constructor')) {
-      child = protoProps.constructor;
+    if (hasOwnProperty.call(prototypeProps || false, 'constructor')) {
+      child = prototypeProps.constructor;
     } else {
       child = function() {
-        var args = new Array(arguments.length);
-        for (var i = 0; i < arguments.length; i++) args[i] = arguments[i];
-        return parent.apply(this, args);
+        return parent.apply(this, arguments);
       };
     }
 
@@ -1565,14 +1704,24 @@
 
     // Add prototype properties (instance properties) to the subclass,
     // if supplied.
-    if (protoProps) _.extend(child.prototype, protoProps);
+    if (prototypeProps) {
+      _.extend(child.prototype, prototypeProps);
+    }
 
     // Set a convenience property in case the parent's prototype is needed
     // later.
     child.__super__ = parent.prototype;
 
     return child;
-  };
+  }
+
+  // Expose Events, Model, Collection, View, Router and History
+  Bedrock.Events = Events;
+  Bedrock.Model = Model;
+  Bedrock.Collection = Collection;
+  Bedrock.View = View;
+  Bedrock.Router = Router;
+  Bedrock.History = History;
 
   // Set up inheritance for the model, collection, router, view and history.
   Model.extend = Collection.extend = Router.extend = View.extend = History.extend = extend;

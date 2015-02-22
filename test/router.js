@@ -227,7 +227,7 @@
   });
 
   test("route precedence via navigate", 6, function(){
-    // check both 0.9.x and backwards-compatibility options
+    // check both current and backwards-compatibility options
     _.each([ { trigger: true }, true ], function( options ){
       Backbone.history.navigate('contacts', options);
       equal(router.contact, 'index');

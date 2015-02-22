@@ -2,7 +2,7 @@
 
   var proxy = Backbone.Model.extend();
   var klass = Backbone.Collection.extend({
-    url : function() { return '/collection'; }
+    url: function() { return '/collection'; }
   });
   var doc, collection;
 
@@ -10,10 +10,10 @@
 
     setup: function() {
       doc = new proxy({
-        id     : '1-the-tempest',
-        title  : "The Tempest",
-        author : "Bill Shakespeare",
-        length : 123
+        id: '1-the-tempest',
+        title: "The Tempest",
+        author: "Bill Shakespeare",
+        length: 123
       });
       collection = new klass();
       collection.add(doc);
@@ -96,7 +96,7 @@
     equal(b.get('foo'), a.get('foo'), "Foo should be the same on the clone.");
     equal(b.get('bar'), a.get('bar'), "Bar should be the same on the clone.");
     equal(b.get('baz'), a.get('baz'), "Baz should be the same on the clone.");
-    a.set({foo : 100});
+    a.set({foo: 100});
     equal(a.get('foo'), 100);
     equal(b.get('foo'), 1, "Changing a parent attribute does not change the clone.");
 
@@ -231,7 +231,7 @@
   });
 
   test("using a non-default id attribute.", 3, function() {
-    var MongoModel = Backbone.Model.extend({idAttribute : '_id'});
+    var MongoModel = Backbone.Model.extend({idAttribute: '_id'});
     var model = new MongoModel({id: 'eye-dee', _id: 25, title: 'Model'});
     equal(model.get('id'), 'eye-dee');
     equal(model.id, 25);
@@ -240,8 +240,8 @@
   });
 
   test("set an empty string", 1, function() {
-    var model = new Backbone.Model({name : "Model"});
-    model.set({name : ''});
+    var model = new Backbone.Model({name: "Model"});
+    model.set({name: ''});
     equal(model.get('name'), '');
   });
 
@@ -262,7 +262,7 @@
 
   test("clear", 3, function() {
     var changed;
-    var model = new Backbone.Model({id: 1, name : "Model"});
+    var model = new Backbone.Model({id: 1, name: "Model"});
     model.on("change:name", function(){ changed = true; });
     model.on("change", function() {
       var changedAttrs = model.changedAttributes();
@@ -335,7 +335,7 @@
   test("defaults always extend attrs (#459)", 2, function() {
     var Defaulted = Backbone.Model.extend({
       defaults: {one: 1},
-      initialize : function(attrs, opts) {
+      initialize: function(attrs, opts) {
         equal(this.attributes.one, 1);
       }
     });
@@ -649,7 +649,7 @@
     });
     model.on('change:a change:b change:c', function(model, val) { changes.push(val); });
     model.set({a:'a', b:1, c:'item'});
-    deepEqual(changes, ['a',1,'item']);
+    deepEqual(changes, ['item',1,'a']);
     deepEqual(model.attributes, {a: 'c', b: 2, c: undefined});
   });
 
