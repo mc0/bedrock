@@ -236,3 +236,26 @@ on the model and returns that new instance.
 function is available at runtime*
 
 A unique group of related (possibly ordered) models.
+
+### <a id="#Bedrock-Collection-move"></a>`move(models, at, options)`
+
+Moves models within a collection; if any models don't exist in the collection,
+they will be added. The event `"move" (collection, models, index)` fires for
+the move and the index sent is the current index of the first model that was
+moved.
+
+NOTE: The `at` passed to `move` is relative to the state of the collection
+_before_ `move` is called. Example:
+
+    // If you want to move a to AFTER c (in other words, at index 3) you'd call coll.move(a, 3)
+     0     2    4
+     |     |    |
+    [ a, b, c, d ]
+        |     |
+        1     3
+    // The resulting array after the move will be
+    [ b, c, a, d ]
+    // Since a is now at index 2, the "move" event will fire with: (coll, [a], 2)
+
+For any models that were added, an `add` event is fired. An `adds` event will
+_not_ be fired unless nothing was actually moved, only added.
