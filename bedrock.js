@@ -1,5 +1,5 @@
 /**
- * Bedrock.js 0.8.3
+ * Bedrock.js 0.9.0
  *
  * Bedrock.js is a foundation framework for large applications
  * by Mark Caudill and James Hartig.
@@ -62,7 +62,7 @@
 // We are making a safe reference to undefined
 }(this, function(exportTo, root, Bedrock, _, $, undefined) {
   // Current version of the library.
-  var VERSION = '0.8.2';
+  var VERSION = '0.9.0';
 
   // Create local references to array/object methods we'll want to use later.
   var Array = root.Array,
