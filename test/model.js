@@ -287,28 +287,36 @@
 
   test("change, hasChanged, changedAttributes, previous, previousAttributes", 12, function() {
     var model = new Backbone.Model({name: "Tim", age: 10});
-    deepEqual(model.changedAttributes(), false);
+    ok(_.isEmpty(model.changedAttributes()));
     equal(model.hasChanged('name'), false);
     equal(model.previous('name'), null);
     deepEqual(model.previousAttributes(), {});
     model.on('change', function() {
       ok(model.hasChanged('name'), 'name changed');
       ok(!model.hasChanged('age'), 'age did not');
-      ok(_.isEqual(model.changedAttributes(), {name : 'Rob'}), 'changedAttributes returns the changed attrs');
+      ok(_.isEqual(model.changedAttributes(), {name: 'Rob'}), 'changedAttributes returns the changed attrs');
       equal(model.previous('name'), 'Tim');
-      ok(_.isEqual(model.previousAttributes(), {name : "Tim", age : 10}), 'previousAttributes is correct');
+      ok(_.isEqual(model.previousAttributes(), {name: "Tim", age: 10}), 'previousAttributes is correct');
     });
     equal(model.hasChanged(), false);
     equal(model.hasChanged(undefined), false);
-    model.set({name : 'Rob'});
+    model.set({name: 'Rob'});
     equal(model.get('name'), 'Rob');
   });
 
-  test("changedAttributes", 3, function() {
+  test("changedAttributes", 2, function() {
     var model = new Backbone.Model({a: 'a', b: 'b'});
-    deepEqual(model.changedAttributes(), false);
-    equal(model.changedAttributes({a: 'a'}), false);
-    equal(model.changedAttributes({a: 'b'}).a, 'b');
+    ok(_.isEmpty(model.changedAttributes()));
+    model.set('a', 'b');
+    equal(model.changedAttributes().a, 'b');
+  });
+
+  test("diff", 3, function() {
+    var model = new Backbone.Model({a: 'a', b: 'b'}),
+        otherModel = new Backbone.Model({a: 'b', b: 'b', c: 'c'});
+    ok(_.isEmpty(model.diff({a: 'a', b: 'b'})));
+    equal(model.diff({a: 'b'}).a, 'b');
+    ok(_.isEqual(model.diff(otherModel), {a: 'b', c: 'c'}));
   });
 
   test("change with options", 2, function() {
@@ -669,7 +677,7 @@
   test("#1943 change calculations should use _.isEqual", function() {
     var model = new Backbone.Model({a: {key: 'value'}});
     model.set('a', {key:'value'}, {silent:true});
-    equal(model.changedAttributes(), false);
+    ok(_.isEmpty(model.changedAttributes()));
   });
 
   test("#1964 - final `change` event is always fired, regardless of interim changes", 1, function () {

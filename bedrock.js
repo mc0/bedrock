@@ -26,8 +26,8 @@
       Bedrock, $, _, globalRef;
 
   // Called when we're ready to setup and export
-  function ready(_, $, exports) {
-    factory(rootContext, root, exports, _, $);
+  function ready(_, $, exportsObj) {
+    factory(rootContext, root, exportsObj, _, $);
   }
 
   // Set up Bedrock appropriately for the environment. Start with AMD.
@@ -257,7 +257,6 @@
       }
 
       names = name ? [name] : _.keys(this._events);
-      i = names.length;
       while (i--) {
         name = names[i];
         if (events = this._events[name]) {
@@ -268,7 +267,7 @@
               ev = events[j];
               if ((callback && callback !== ev.callback && callback !== ev.callback._callback) ||
                   (context && context !== ev.context)) {
-                remaining[remaining.length] = ev;
+                remaining.push(ev);
               }
             }
           }
@@ -457,7 +456,7 @@
     // anyone who needs to know about the change in state. The heart of the beast.
     set: function(key, valOrOpts, opts) {
       var val, attr, attrs, unset, changes, silent, changing, prev, current,
-          options, changed, attrDiffers;
+          options, changed, attrDiffers, keys, attrPos, i, l;
       if (key == null || key === false) return this;
 
       // Fast-track for handling .unset and .clear
@@ -489,8 +488,8 @@
       prev = this._previousAttributes;
 
       // For each `set` attribute, update or delete the current value.
-      var keys = _.keys(attrs),
-          attrPos = keys.length;
+      keys = _.keys(attrs);
+      attrPos = keys.length;
       while (attrPos--) {
         attr = keys[attrPos];
         if (!unset) val = attrs[attr];
@@ -517,7 +516,7 @@
       // Trigger all relevant attribute changes.
       if (!silent && changes.length) {
         this._pending = options;
-        for (var i = 0, l = changes.length; i < l; i++) {
+        for (i = 0, l = changes.length; i < l; i++) {
           this.trigger('change:' + changes[i], this, current[changes[i]], options);
         }
 
@@ -554,27 +553,40 @@
       return hasOwnProperty.call(this.changed, attr);
     },
 
-    // Return an object containing all the attributes that have changed, or
-    // false if there are no changed attributes. Useful for determining what
-    // parts of a view need to be updated and/or what attributes need to be
-    // persisted to the server. Unset attributes will be set to undefined.
-    // You can also pass an attributes object to diff against the model,
-    // determining if there *would be* a change.
-    changedAttributes: function(diff) {
-      if (!diff) return this.hasChanged() ? _.clone(this.changed) : false;
-      var changed = false,
+    // Returns an object containing all the attributes that have changed since
+    // the last `"change"` event. Useful for determining what parts of a view
+    // need to be updated and/or what attributes need to be persisted to the
+    // server. Unset attributes will be set to undefined.
+    changedAttributes: function() {
+      return _.clone(this.changed);
+    },
+
+    // Returns a diff between an attributes object to determine what is
+    // different between the attributes. Also accepts another model.
+    diff: function(diff) {
+      var changed = {},
           changing = this._changing,
           old = this._previousAttributes,
           current = this.attributes,
-          keys = _.keys(diff),
-          i = keys.length,
-          attr, val;
+          attrs = diff,
+          keys, i, attr, val;
+
+      if (typeof attrs === 'object' && attrs instanceof Model) {
+        attrs = attrs.attributes;
+      }
+
+      keys = _.keys(attrs);
+      i = keys.length;
       while (i--) {
         attr = keys[i];
-        val = diff[attr];
-        if (changing && hasOwnProperty.call(old, attr) && _.isEqual(old[attr], val)) continue;
-        if (_.isEqual(current[attr], val)) continue;
-        (changed || (changed = {}))[attr] = val;
+        val = attrs[attr];
+        if (changing && hasOwnProperty.call(old, attr) && _.isEqual(old[attr], val)) {
+          continue;
+        }
+        if (_.isEqual(current[attr], val)) {
+          continue;
+        }
+        changed[attr] = val;
       }
       return changed;
     },
@@ -1266,7 +1278,7 @@
           i = keys.length,
           method, key, pos, curPos, eventName, selector;
       this.undelegateEvents();
-      while(i--) {
+      while (i--) {
         key = keys[i];
         if (hasOwnProperty.call(events, key)) {
           method = events[key];
