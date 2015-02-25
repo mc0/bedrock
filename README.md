@@ -49,6 +49,18 @@ Defining a `modelId` is not supported.
 
 `Collection.sort` no longer throws an exception when there is no comparator present.
 
+`Model.changedAttributes` no longer accepts a `attributes`. Instead, there is a `Model.diff`.
+
+`Model.changedAttributes` no longer returns false if nothing has changed since the last `"change"` event.
+
+`History.start` returns `false` instead of `undefined` when the `silent` option is specified.
+
+`History.checkUrl` returns `true` instead of `undefined` when there is a url match.
+
+`History.navigate` returns `true` instead of `undefined` upon successfully navigating.
+
+CommonJS inclusions will now attempt to use `jQuery`, `Zepto`, `ender` and `$` from `window`/`root` if available
+
 # Why?
 
 Grooveshark needed a extremely lightweight framework for dealing with Models/Collections. It was acceptable to cut features and cut corners
