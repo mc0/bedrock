@@ -1520,7 +1520,7 @@
 
       // Figure out the initial configuration. Do we need an iframe?
       // Is pushState desired ... is it available?
-      var fragment = this.getFragment(),
+      var fragment = this.getFragment(null, false),
           docMode = document.documentMode,
           oldIE = (isExplorer.exec(navigator.userAgent.toLowerCase()) && (!docMode || docMode <= 7)),
           loc = this.location;
@@ -1575,7 +1575,7 @@
       }
 
       if (this.options.silent) {
-        return;
+        return false;
       }
 
       return this.loadUrl();
@@ -1601,7 +1601,7 @@
     // Checks the current URL to see if it has changed, and if it has,
     // calls `loadUrl`, normalizing across the hidden iframe.
     checkUrl: function(e) {
-      var current = this.getFragment();
+      var current = this.getFragment(null, false);
       if (current === this.fragment && this.iframe) {
         current = this.getFragment(this.getHash(this.iframe));
       }
@@ -1614,6 +1614,8 @@
         this.navigate(current);
       }
       this.loadUrl();
+
+      return true;
     },
 
     // Attempt to load the current URL fragment. If a route succeeds with a
@@ -1627,6 +1629,7 @@
           handler.callback(fragment);
           return true;
         }
+        return false;
       });
     },
 
@@ -1647,7 +1650,7 @@
       // Strip the hash for matching.
       fragment = fragment.replace(pathStripper, '');
 
-      if (this.fragment === fragment) return;
+      if (this.fragment === fragment) return false;
       this.fragment = fragment;
 
       // Don't include a trailing slash on the root.
@@ -1672,9 +1675,12 @@
       // If you've told us that you explicitly don't want fallback hashchange-
       // based history, then `navigate` becomes a page refresh.
       } else {
-        return this.location.assign(url);
+        this.location.assign(url);
+        return true;
       }
       if (options.trigger) this.loadUrl(fragment);
+
+      return true;
     },
 
     // Update the hash location, either replacing the current entry, or adding
