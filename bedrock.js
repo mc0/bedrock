@@ -22,47 +22,47 @@
   // Initial Setup
   // -------------
 
-  var $, _;
+  var rootContext = root,
+      Bedrock, $, _, globalRef;
+
+  // Called when we're ready to setup and export
+  function ready(_, $, exports) {
+    factory(rootContext, root, exports, _, $);
+  }
 
   // Set up Bedrock appropriately for the environment. Start with AMD.
   if (typeof define === 'function' && define.amd) {
-    define(['lodash', 'jquery', 'exports'], function(_, $, exports) {
-        // Export global even in AMD case in case this script is loaded with
-        // others that may still expect a global Bedrock.
-        root.Bedrock = factory(root, exports, _, $);
-    });
+    // Export global even in AMD case in case this script is loaded with
+    // others that may still expect a global Bedrock.
+    define(['lodash', 'jquery', 'exports'], ready);
+    return;
+  }
 
-  // Next for Node.js or CommonJS. jQuery may not be needed as a module.
-  } else if (typeof exports !== 'undefined') {
-    // Require Lodash if we're on the server and it's not already present.
+  // For Bedrock's purposes, jQuery, Zepto, Ender, or jQuery-like library owns
+  // the `$` variable.
+  $ = root.jQuery || root.Zepto || root.ender || root.$;
+
+  // For Node.js or CommonJS. jQuery may not be needed as a module.
+  if (typeof exports !== 'undefined' && typeof module !== 'undefined') {
+    // Require lodash if we're on the server and it's not already present.
     _ = require('lodash');
-    factory(root, exports, _);
-
-  // Finally, as a browser global.
+    Bedrock = exports;
+    // The root in node.js may not be this context
+    globalRef = exports && module && typeof global == 'object' && global;
+    if (globalRef && (globalRef.global === globalRef || globalRef.window === globalRef || globalRef.self === globalRef)) {
+      root = globalRef;
+    }
+    // Do not export on root
+    rootContext = null;
+    ready(_, $, Bedrock);
   } else {
-    // For Bedrock's purposes, jQuery, Zepto, Ender, or jQuery-like library owns
-    // the `$` variable.
-    $ = root.jQuery || root.Zepto || root.ender || root.$;
-    root.Bedrock = factory(root, {}, root._, $);
+    ready(root._, $, {});
   }
 
 // We are making a safe reference to undefined
-}(this, function(root, Bedrock, _, $, undefined) {
+}(this, function(exportTo, root, Bedrock, _, $, undefined) {
   // Current version of the library.
-  Bedrock.VERSION = '0.8.2';
-
-  Bedrock.$ = $;
-
-  // Save the previous value of the `Bedrock` variable, so that it can be
-  // restored later on, if `noConflict` is used.
-  var previousBedrock = root.Bedrock;
-
-  // Runs Bedrock.js in *noConflict* mode, returning the `Bedrock` variable
-  // to its previous owner. Returns a reference to this Bedrock object.
-  Bedrock.noConflict = function() {
-    root.Bedrock = previousBedrock;
-    return this;
-  };
+  var VERSION = '0.8.2';
 
   // Create local references to array/object methods we'll want to use later.
   var Array = root.Array,
@@ -72,6 +72,21 @@
 
   // A noop function for doing nothing
   function noop() {}
+
+  // Runs Bedrock.js in *noConflict* mode, returning the `Bedrock` variable
+  // to its previous owner. Returns a reference to this Bedrock object.
+  var noConflict = function() {
+    if (!exportTo) {
+      return noop;
+    }
+    // The previous value of the `Bedrock` variable
+    var previousBedrock = exportTo.Bedrock;
+
+    return function() {
+      exportTo.Bedrock = previousBedrock;
+      return Bedrock;
+    }
+  }();
 
   // Trim whitespace (simplified)
   var trim = function() {
@@ -1664,9 +1679,6 @@
 
   });
 
-  // Create the default Bedrock.history.
-  Bedrock.history = new History;
-
   // Helpers
   // -------
   var objCreate = function() {
@@ -1715,6 +1727,14 @@
     return child;
   }
 
+  // Export
+  // -------------
+  Bedrock.VERSION = VERSION;
+  Bedrock.$ = $;
+
+  // Set up inheritance for the model, collection, router, view and history.
+  Model.extend = Collection.extend = Router.extend = View.extend = History.extend = extend;
+
   // Expose Events, Model, Collection, View, Router and History
   Bedrock.Events = Events;
   Bedrock.Model = Model;
@@ -1723,9 +1743,13 @@
   Bedrock.Router = Router;
   Bedrock.History = History;
 
-  // Set up inheritance for the model, collection, router, view and history.
-  Model.extend = Collection.extend = Router.extend = View.extend = History.extend = extend;
+  // Create the default Bedrock.history.
+  Bedrock.history = new History;
 
-  return Bedrock;
-
+  if (exportTo) {
+    Bedrock.noConflict = noConflict;
+    exportTo.Bedrock = Bedrock;
+  } else {
+    Bedrock.noConflict = noop;
+  }
 }));
