@@ -1,5 +1,5 @@
 /**
- * Bedrock.js 0.8.2
+ * Bedrock.js 0.8.3
  *
  * Bedrock.js is a foundation framework for large applications
  * by Mark Caudill and James Hartig.

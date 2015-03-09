@@ -14,7 +14,7 @@
     "test": "phantomjs test/vendor/runner.js test/index.html?noglobals=true && coffee test/model.coffee"
   },
   "main" : "bedrock.js",
-  "version" : "0.8.2",
+  "version" : "0.8.3",
   "license" : "MIT",
   "repository" : {
     "type": "git",
