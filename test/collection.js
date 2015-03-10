@@ -981,14 +981,16 @@
       parse: function(a) {
         var attrs = {};
         attrs._id = a.__id;
+        attrs.a = a.a || 0;
         return attrs;
       }
     });
     var StoogeCollection = Backbone.Collection.extend({model: Stooge});
     var c = new StoogeCollection();
-    c.add([{__id: 1}, {__id: 1}], {parse: true});
+    c.add([{__id: 1}, {__id: 1, a: 1}], {parse: true, merge: true});
     equal(c.length, 1);
     equal(c.models.length, 1);
+    equal(c.get(1).get('a'), 1);
     c.set([{__id: 1}, {__id: 1}], {parse: true});
     equal(c.length, 1);
     equal(c.models.length, 1);

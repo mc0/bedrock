@@ -682,7 +682,7 @@
         // optionally merge it into the existing model.
         existing = this.get(attrs);
         if (!existing) {
-           model = this._prepareModel(attrs, modelOptions);
+           attrs = model = this._prepareModel(attrs, modelOptions);
            if (model && model.valid) {
              existing = this.get(model);
            }
