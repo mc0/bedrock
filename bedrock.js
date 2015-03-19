@@ -317,12 +317,13 @@
   // Doesn't clone attributes parameter unless done so in parse.
   var Model = Bedrock.Model = function(attributes, opts) {
     var options = opts || {};
-    this.cid = 'c' + (uniqueCIDCount++);
+    if (!options.noCID) this.cid = 'c' + (uniqueCIDCount++);
     var validAttrs = this.parse(attributes, options);
     var attrs = validAttrs || {};
     if (validAttrs === false) this.valid = false;
     if (this.defaults) attrs = _.defaults({}, attrs, this.defaults);
     if (attrs.hasOwnProperty(this.idAttribute)) this.id = attrs[this.idAttribute];
+    if (this.cid == null && this.id == null) throw new TypeError('No cid or id on model');
     this.attributes = attrs;
     this._previousAttributes = null;
     this.changed = {};
@@ -630,7 +631,7 @@
         model = models[i] = this.get(models[i]);
         if (!model) continue;
         delete this._byId[model.id];
-        delete this._byId[model.cid];
+        if (model.cid != null) delete this._byId[model.cid];
         index = this.indexOf(model);
         this.models.splice(index, 1);
         this.length--;
@@ -688,7 +689,7 @@
            }
         }
         if (existing) {
-          if (options.remove) modelMap[existing.cid] = true;
+          if (options.remove) modelMap[existing.cid || existing.id] = true;
           if (options.move) {
             index = this.indexOf(existing);
             // If we removed something before at, the first model is moving back, otherwise
@@ -732,7 +733,10 @@
           order.push(model);
 
           // Check to see if this is actually a new model at this index.
-          orderChanged = orderChanged || !this.models[i] || model.cid !== this.models[i].cid;
+          if (!orderChanged) {
+            orderChanged = !this.models[i] || (model.cid != null && model.cid !== this.models[i].cid) ||
+              (model.id != null && model.id !== this.models[i].id);
+          }
         }
         // If a model doesn't have an id don't store it in modelMap
         if (model.id != null) modelMap[model.id] = true;
@@ -741,7 +745,8 @@
       // Remove nonexistent models if appropriate.
       if (options.remove) {
         for (i = 0, l = this.length; i < l; ++i) {
-          if (!modelMap[(model = this.models[i]).cid]) toRemove.push(model);
+          model = this.models[i];
+          if (!modelMap[model.cid || model.id]) toRemove.push(model);
         }
         if (toRemove.length) this.remove(toRemove, options);
       }
@@ -837,7 +842,7 @@
     get: function(obj) {
       if (obj == null) return void 0;
       var id = obj[this.model.prototype.idAttribute] || obj.id;
-      return this._byId[obj] || this._byId[id] || this._byId[obj.cid];
+      return this._byId[obj] || this._byId[id] || (obj.cid != null && this._byId[obj.cid]) || void 0;
     },
 
     // Get the model at the given index.
@@ -944,7 +949,7 @@
 
     // Internal method to create a model's ties to a collection.
     _addReference: function(model) {
-      this._byId[model.cid] = model;
+      if (model.cid != null) this._byId[model.cid] = model;
       if (model.id != null) this._byId[model.id] = model;
       model.on('all', this._onModelEvent, this);
     },
