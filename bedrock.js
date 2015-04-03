@@ -836,8 +836,10 @@
     // Get a model from the set by id.
     get: function(obj) {
       if (obj == null) return void 0;
-      var id = obj[this.model.prototype.idAttribute] || obj.id;
-      return this._byId[obj] || this._byId[id] || this._byId[obj.cid];
+      if (typeof obj !== 'object') return this._byId[obj];
+      var idProp = this.model.prototype.idAttribute;
+      var id = obj[idProp] != null ? obj[idProp] : obj.id;
+      return this._byId[id] || this._byId[obj.cid];
     },
 
     // Get the model at the given index.
