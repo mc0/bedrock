@@ -1,7 +1,9 @@
 bedrock
 =======
 
-A simplified, fast framework for Models, Views, Controllers and Events based off [Backbone.js](https://github.com/jashkenas/backbone)
+A simplified, fast framework for Models, Views, Collections and Events based off [Backbone.js](https://github.com/jashkenas/backbone)
+
+* [Documentation](doc/)
 
 # Differences from Backbone.js
 
@@ -37,13 +39,27 @@ Collections accept `modelOptions` that gets passed along for every model created
 
 `Collection.move` now allows moving models around within a collection; if the models don't exist in the collection, then new models will be added.
 The event `"move" (collection, models, index)` fires for the move and the index sent is the index of the first model in models. For any models
-that were added, an `add` event is fired.
+that were added, an `add` event is fired. An `adds` event will NOT be fired unless nothing was moved, only added.
 
 When cloning on a collection, a custom `comparator` is NOT transferred over to the new collection. A custom `model` is, however.
 
 `routes` and `defaults` cannot be functions.
 
 Defining a `modelId` is not supported.
+
+`Collection.sort` no longer throws an exception when there is no comparator present.
+
+`Model.changedAttributes` no longer accepts a `attributes`. Instead, there is a `Model.diff`.
+
+`Model.changedAttributes` no longer returns false if nothing has changed since the last `"change"` event.
+
+`History.start` returns `false` instead of `undefined` when the `silent` option is specified.
+
+`History.checkUrl` returns `true` instead of `undefined` when there is a url match.
+
+`History.navigate` returns `true` instead of `undefined` upon successfully navigating.
+
+CommonJS inclusions will now attempt to use `jQuery`, `Zepto`, `ender` and `$` from `window`/`root` if available
 
 # Why?
 

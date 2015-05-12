@@ -2,7 +2,7 @@
 
   var proxy = Backbone.Model.extend();
   var klass = Backbone.Collection.extend({
-    url : function() { return '/collection'; }
+    url: function() { return '/collection'; }
   });
   var doc, collection;
 
@@ -10,10 +10,10 @@
 
     setup: function() {
       doc = new proxy({
-        id     : '1-the-tempest',
-        title  : "The Tempest",
-        author : "Bill Shakespeare",
-        length : 123
+        id: '1-the-tempest',
+        title: "The Tempest",
+        author: "Bill Shakespeare",
+        length: 123
       });
       collection = new klass();
       collection.add(doc);
@@ -96,7 +96,7 @@
     equal(b.get('foo'), a.get('foo'), "Foo should be the same on the clone.");
     equal(b.get('bar'), a.get('bar'), "Bar should be the same on the clone.");
     equal(b.get('baz'), a.get('baz'), "Baz should be the same on the clone.");
-    a.set({foo : 100});
+    a.set({foo: 100});
     equal(a.get('foo'), 100);
     equal(b.get('foo'), 1, "Changing a parent attribute does not change the clone.");
 
@@ -231,7 +231,7 @@
   });
 
   test("using a non-default id attribute.", 3, function() {
-    var MongoModel = Backbone.Model.extend({idAttribute : '_id'});
+    var MongoModel = Backbone.Model.extend({idAttribute: '_id'});
     var model = new MongoModel({id: 'eye-dee', _id: 25, title: 'Model'});
     equal(model.get('id'), 'eye-dee');
     equal(model.id, 25);
@@ -240,8 +240,8 @@
   });
 
   test("set an empty string", 1, function() {
-    var model = new Backbone.Model({name : "Model"});
-    model.set({name : ''});
+    var model = new Backbone.Model({name: "Model"});
+    model.set({name: ''});
     equal(model.get('name'), '');
   });
 
@@ -262,7 +262,7 @@
 
   test("clear", 3, function() {
     var changed;
-    var model = new Backbone.Model({id: 1, name : "Model"});
+    var model = new Backbone.Model({id: 1, name: "Model"});
     model.on("change:name", function(){ changed = true; });
     model.on("change", function() {
       var changedAttrs = model.changedAttributes();
@@ -287,28 +287,36 @@
 
   test("change, hasChanged, changedAttributes, previous, previousAttributes", 12, function() {
     var model = new Backbone.Model({name: "Tim", age: 10});
-    deepEqual(model.changedAttributes(), false);
+    ok(_.isEmpty(model.changedAttributes()));
     equal(model.hasChanged('name'), false);
     equal(model.previous('name'), null);
     deepEqual(model.previousAttributes(), {});
     model.on('change', function() {
       ok(model.hasChanged('name'), 'name changed');
       ok(!model.hasChanged('age'), 'age did not');
-      ok(_.isEqual(model.changedAttributes(), {name : 'Rob'}), 'changedAttributes returns the changed attrs');
+      ok(_.isEqual(model.changedAttributes(), {name: 'Rob'}), 'changedAttributes returns the changed attrs');
       equal(model.previous('name'), 'Tim');
-      ok(_.isEqual(model.previousAttributes(), {name : "Tim", age : 10}), 'previousAttributes is correct');
+      ok(_.isEqual(model.previousAttributes(), {name: "Tim", age: 10}), 'previousAttributes is correct');
     });
     equal(model.hasChanged(), false);
     equal(model.hasChanged(undefined), false);
-    model.set({name : 'Rob'});
+    model.set({name: 'Rob'});
     equal(model.get('name'), 'Rob');
   });
 
-  test("changedAttributes", 3, function() {
+  test("changedAttributes", 2, function() {
     var model = new Backbone.Model({a: 'a', b: 'b'});
-    deepEqual(model.changedAttributes(), false);
-    equal(model.changedAttributes({a: 'a'}), false);
-    equal(model.changedAttributes({a: 'b'}).a, 'b');
+    ok(_.isEmpty(model.changedAttributes()));
+    model.set('a', 'b');
+    equal(model.changedAttributes().a, 'b');
+  });
+
+  test("diff", 3, function() {
+    var model = new Backbone.Model({a: 'a', b: 'b'}),
+        otherModel = new Backbone.Model({a: 'b', b: 'b', c: 'c'});
+    ok(_.isEmpty(model.diff({a: 'a', b: 'b'})));
+    equal(model.diff({a: 'b'}).a, 'b');
+    ok(_.isEqual(model.diff(otherModel), {a: 'b', c: 'c'}));
   });
 
   test("change with options", 2, function() {
@@ -335,7 +343,7 @@
   test("defaults always extend attrs (#459)", 2, function() {
     var Defaulted = Backbone.Model.extend({
       defaults: {one: 1},
-      initialize : function(attrs, opts) {
+      initialize: function(attrs, opts) {
         equal(this.attributes.one, 1);
       }
     });
@@ -649,7 +657,7 @@
     });
     model.on('change:a change:b change:c', function(model, val) { changes.push(val); });
     model.set({a:'a', b:1, c:'item'});
-    deepEqual(changes, ['a',1,'item']);
+    deepEqual(changes, ['item',1,'a']);
     deepEqual(model.attributes, {a: 'c', b: 2, c: undefined});
   });
 
@@ -669,7 +677,7 @@
   test("#1943 change calculations should use _.isEqual", function() {
     var model = new Backbone.Model({a: {key: 'value'}});
     model.set('a', {key:'value'}, {silent:true});
-    equal(model.changedAttributes(), false);
+    ok(_.isEmpty(model.changedAttributes()));
   });
 
   test("#1964 - final `change` event is always fired, regardless of interim changes", 1, function () {

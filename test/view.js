@@ -72,17 +72,6 @@
     equal(counter2, 3);
   });
 
-  test("delegate", 2, function() {
-    var view = new Backbone.View({el: '#testElement'});
-    view.delegate('click', 'h1', function() {
-      ok(true);
-    });
-    view.delegate('click', function() {
-      ok(true);
-    });
-    view.$('h1').trigger('click');
-  });
-
   test("delegateEvents allows functions for callbacks", 3, function() {
     var view = new Backbone.View({el: '<p></p>'});
     view.counter = 0;
@@ -137,61 +126,12 @@
     equal(counter2, 3);
   });
 
-  test("undelegate", 0, function() {
-    view = new Backbone.View({el: '#testElement'});
-    view.delegate('click', function() { ok(false); });
-    view.delegate('click', 'h1', function() { ok(false); });
-
-    view.undelegate('click');
-
-    view.$('h1').trigger('click');
-    view.$el.trigger('click');
-  });
-
-  test("undelegate with passed handler", 1, function() {
-    view = new Backbone.View({el: '#testElement'});
-    var listener = function() { ok(false); };
-    view.delegate('click', listener);
-    view.delegate('click', function() { ok(true); });
-    view.undelegate('click', listener);
-    view.$el.trigger('click');
-  });
-
-  test("undelegate with selector", 2, function() {
-    view = new Backbone.View({el: '#testElement'});
-    view.delegate('click', function() { ok(true); });
-    view.delegate('click', 'h1', function() { ok(false); });
-    view.undelegate('click', 'h1');
-    view.$('h1').trigger('click');
-    view.$el.trigger('click');
-  });
-
-  test("undelegate with handler and selector", 2, function() {
-    view = new Backbone.View({el: '#testElement'});
-    view.delegate('click', function() { ok(true); });
-    var handler = function(){ ok(false); };
-    view.delegate('click', 'h1', handler);
-    view.undelegate('click', 'h1', handler);
-    view.$('h1').trigger('click');
-    view.$el.trigger('click');
-  });
-
   test("tagName can be provided as a string", 1, function() {
     var View = Backbone.View.extend({
       tagName: 'span'
     });
 
     equal(new View().el.tagName, 'SPAN');
-  });
-
-  test("tagName can be provided as a function", 1, function() {
-    var View = Backbone.View.extend({
-      tagName: function() {
-        return 'p';
-      }
-    });
-
-    ok(new View().$el.is('p'));
   });
 
   test("_ensureElement with DOM node el", 1, function() {
@@ -243,16 +183,6 @@
 
     strictEqual(new View().el.className, 'class');
     strictEqual(new View().el.id, 'id');
-  });
-
-  test("with attributes as a function", 1, function() {
-    var View = Backbone.View.extend({
-      attributes: function() {
-        return {'class': 'dynamic'};
-      }
-    });
-
-    strictEqual(new View().el.className, 'dynamic');
   });
 
   test("multiple views per element", 3, function() {
@@ -355,18 +285,6 @@
     view.collection.trigger('x');
   });
 
-  test("Provide function for el.", 2, function() {
-    var View = Backbone.View.extend({
-      el: function() {
-        return "<p><a></a></p>";
-      }
-    });
-
-    var view = new View;
-    ok(view.$el.is('p'));
-    ok(view.$el.has('a'));
-  });
-
   test("events passed in options", 1, function() {
     var counter = 0;
 
@@ -391,7 +309,9 @@
     var view = new Backbone.View;
     document.body.appendChild(view.el);
 
-    view.delegate('click', function() { ok(false); });
+    view.delegateEvents({
+      'click': function() { ok(false); }
+    });
     view.listenTo(view, 'all x', function() { ok(false); });
 
     view.remove();
